@@ -1,5 +1,17 @@
 # Revision history for reflex
 
+## 0.9.3.0
+
+* Headless Host: Generalize to allow returning arbitrary types
+
+## 0.9.2.0
+
+* Add MonadMask, MonadCatch, MonadThrow instances
+
+## 0.9.1.0
+
+* Headless Host: Add some MonadSample, MonadHold, and MonadFix instances
+
 ## 0.9.0.1
 
 * Add support for ghc-9.6
