@@ -122,7 +122,7 @@ runEventWriterT (EventWriterT a) = do
   let combineResults :: DMap (TellId w) Identity -> w
       combineResults = sconcat
         . (\(h : t) -> h :| t) -- Unconditional; 'merge' guarantees that it will only fire with non-empty DMaps
-        . DMap.foldlWithKey (\vs tid (Identity v) -> withTellIdRefl tid $ v : vs) [] -- This is where we finally reverse the DMap to get things in the correct order
+        . DMap.foldrWithKey (\tid (Identity v) vs -> withTellIdRefl tid $ v : vs) []
   return (result, fmap combineResults $ merge $ DMap.fromDistinctAscList $ _eventWriterState_told requests) --TODO: We can probably make this fromDistinctAscList more efficient by knowing the length in advance, but this will require exposing internals of DMap; also converting it to use a strict list might help
 
 instance (Reflex t, Monad m, Semigroup w) => EventWriter t w (EventWriterT t w m) where
