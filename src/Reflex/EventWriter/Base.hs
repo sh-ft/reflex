@@ -86,7 +86,7 @@ runEventWriterT (EventWriterT a) = do
   let combineResults :: IntMap w -> w
       combineResults = sconcat
         . (\(h : t) -> h :| t) -- Unconditional; 'mergeInt' guarantees that it will only fire with non-empty IntMaps
-        . IntMap.foldl (flip (:)) [] -- Ascending key order is reverse tell order, so prepend while traversing to restore tell order
+        . IntMap.foldr (:) [] -- Ascending key order is reverse tell order, so prepend while traversing to restore tell order
   return (result, fmap combineResults $ mergeInt $ IntMap.fromDistinctAscList $ zip [0 ..] told)
 
 instance (Reflex t, Monad m, Semigroup w) => EventWriter t w (EventWriterT t w m) where
