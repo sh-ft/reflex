@@ -34,8 +34,9 @@ import Reflex.EventWriter.Class
 import Reflex.EventWriter.Base
 
 import Control.Lens
+import Control.Monad.Catch (MonadMask, MonadThrow, MonadCatch)
 import Control.Monad.Exception
-import Control.Monad.Identity
+import Control.Monad.Fix
 import Control.Monad.Primitive
 import Control.Monad.Reader
 import Control.Monad.Ref
@@ -73,6 +74,9 @@ deriving instance (ReflexHost t, MonadIO (HostFrame t)) => MonadIO (PerformEvent
 deriving instance (ReflexHost t, MonadException (HostFrame t)) => MonadException (PerformEventT t m)
 deriving instance (ReflexHost t, Monoid a) => Monoid (PerformEventT t m a)
 deriving instance (ReflexHost t, S.Semigroup a) => S.Semigroup (PerformEventT t m a)
+deriving instance (ReflexHost t, MonadCatch (HostFrame t)) => MonadCatch (PerformEventT t m)
+deriving instance (ReflexHost t, MonadThrow (HostFrame t)) => MonadThrow (PerformEventT t m)
+deriving instance (ReflexHost t, MonadMask (HostFrame t)) => MonadMask (PerformEventT t m)
 
 instance (PrimMonad (HostFrame t), ReflexHost t) => PrimMonad (PerformEventT t m) where
   type PrimState (PerformEventT t m) = PrimState (HostFrame t)
@@ -162,9 +166,7 @@ instance ReflexHost t => MonadReflexCreateTrigger t (PerformEventT t m) where
 -- at the appropriate time.
 {-# INLINABLE hostPerformEventT #-}
 hostPerformEventT :: forall t m a.
-                     ( Monad m
-                     , MonadSubscribeEvent t m
-                     , MonadReflexHost t m
+                     ( MonadReflexHost t m
                      , MonadRef m
                      , Ref m ~ Ref IO
                      , PrimMonad (HostFrame t)
@@ -208,6 +210,8 @@ instance (ReflexHost t, MonadHold t m) => MonadHold t (PerformEventT t m) where
   buildDynamic getV0 v' = PerformEventT $ lift $ buildDynamic getV0 v'
   {-# INLINABLE headE #-}
   headE = PerformEventT . lift . headE
+  {-# INLINABLE now #-}
+  now = PerformEventT . lift $ now
 
 instance (MonadRef (HostFrame t), ReflexHost t) => MonadRef (PerformEventT t m) where
   type Ref (PerformEventT t m) = Ref (HostFrame t)

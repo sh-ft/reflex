@@ -11,7 +11,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE InstanceSigs #-}
 #ifdef USE_REFLEX_OPTIMIZER
@@ -21,6 +20,7 @@ module Reflex.Requester.Base.Internal where
 
 import Reflex.Class
 import Reflex.Adjustable.Class
+import Reflex.Dynamic
 import Reflex.Host.Class
 import Reflex.PerformEvent.Class
 import Reflex.PostBuild.Class
@@ -37,8 +37,9 @@ import Control.Monad.Primitive
 import Control.Monad.Reader
 import Control.Monad.Ref
 import Control.Monad.State
+import Control.Monad.Catch (MonadMask, MonadThrow, MonadCatch)
 import Data.Coerce
-import Data.Dependent.Map (DSum (..))
+import Data.Dependent.Sum (DSum (..))
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.List.NonEmpty.Deferred (NonEmptyDeferred)
 import qualified Data.List.NonEmpty.Deferred as NonEmptyDeferred
@@ -124,14 +125,21 @@ withRequesterInternalT f = do
 data FakeRequesterStatePhantom
 
 newtype RequesterT t (request :: * -> *) (response :: * -> *) m a = RequesterT { unRequesterT :: RequesterInternalT FakeRequesterStatePhantom t request response m a }
-  deriving (Functor, Applicative, Monad, MonadFix, MonadIO, MonadException)
+  deriving
+    ( Functor, Applicative, Monad, MonadFix, MonadIO, MonadException
+    , MonadAsyncException
+    , MonadCatch
+    , MonadThrow
+    , MonadMask
+    )
 
 newtype RequesterInternalT s t request response m a = RequesterInternalT { unRequesterInternalT :: ReaderT (EventSelectorTag t s response, TagGen (PrimState m) s) (EventWriterT t (NonEmptyDeferred (RequestEnvelope s request)) m) a }
   deriving
     ( Functor, Applicative, Monad, MonadFix, MonadIO, MonadException
-#if MIN_VERSION_base(4,9,1)
     , MonadAsyncException
-#endif
+    , MonadCatch
+    , MonadThrow
+    , MonadMask
     )
 
 -- I don't think this can actually be supported without unsafeCoercing around the fact that the phantoms don't match up.  In fact, implementations could probably supply `unmask` functions that would actually do the wrong thing.
@@ -149,6 +157,9 @@ deriving instance MonadSample t m => MonadSample t (RequesterInternalT s t reque
 deriving instance MonadHold t m => MonadHold t (RequesterInternalT s t request response m)
 deriving instance PostBuild t m => PostBuild t (RequesterInternalT s t request response m)
 deriving instance TriggerEvent t m => TriggerEvent t (RequesterInternalT s t request response m)
+
+instance EventWriter t w m => EventWriter t w (RequesterT t request response m) where
+  tellEvent = lift . tellEvent
 
 instance PrimMonad m => PrimMonad (RequesterT t request response m) where
   type PrimState (RequesterT t request response m) = PrimState m

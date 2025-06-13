@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -49,6 +50,17 @@ import Debug.Trace hiding (traceEvent)
 
 data RequestInt a where
   RequestInt :: Int -> RequestInt Int
+
+data TestRequest a where
+  TestRequest_Reverse :: String -> TestRequest String
+  TestRequest_Increment :: Int -> TestRequest Int
+
+deriveArgDict ''TestRequest
+
+instance Show (TestRequest a) where
+  show = \case
+    TestRequest_Reverse str -> "reverse " <> str
+    TestRequest_Increment i -> "increment " <> show i
 
 main :: IO ()
 main = do
@@ -214,15 +226,6 @@ delayedPulse pulse = void $ flip runWithReplace (pure () <$ pulse) $ do
     (_, pulse') <- runWithReplace (pure ()) $ pure (RequestInt 1) <$ pulse
     requestingIdentity pulse'
 
-data TestRequest a where
-  TestRequest_Reverse :: String -> TestRequest String
-  TestRequest_Increment :: Int -> TestRequest Int
-
-instance Show (TestRequest a) where
-  show = \case
-    TestRequest_Reverse str -> "reverse " <> str
-    TestRequest_Increment i -> "increment " <> show i
-
 testMatchRequestsWithResponses
   :: forall m t req a
    . ( MonadFix m
@@ -270,6 +273,3 @@ testMoribundPerformEvent pulse = do
     performPrint i evt =
       performEvent $ ffor evt $ \output ->
         return $ show i <> ":" <> show output
-
-
-deriveArgDict ''TestRequest

@@ -33,14 +33,18 @@ import Reflex.Query.Class
 import Reflex.Requester.Class
 import Reflex.TriggerEvent.Class
 
+import Control.Monad.Catch (MonadMask, MonadThrow, MonadCatch)
 import Control.Monad.Exception
+import Control.Monad.Fix
 import Control.Monad.Identity
+import Control.Monad.Morph
 import Control.Monad.Primitive
 import Control.Monad.Reader
 import Control.Monad.Ref
 import Control.Monad.State.Strict
 import Data.Dependent.Map (DMap)
 import qualified Data.Dependent.Map as DMap
+import Data.Dependent.Sum (DSum (..))
 import Data.Functor.Compose
 import Data.Functor.Misc
 import Data.GADT.Compare (GCompare (..))
@@ -57,7 +61,20 @@ import Data.Tuple
 
 -- | A basic implementation of 'EventWriter'.
 newtype EventWriterT t w m a = EventWriterT { unEventWriterT :: StateT (Deferred (Event t w)) m a }
-  deriving (Functor, Applicative, Monad, MonadFix, MonadIO, MonadException, MonadAsyncException)
+  deriving
+    ( Functor
+    , Applicative
+    , Monad
+    , MonadTrans
+    , MFunctor
+    , MonadFix
+    , MonadIO
+    , MonadException
+    , MonadAsyncException
+    , MonadMask
+    , MonadCatch
+    , MonadThrow
+    )
 
 -- | Run a 'EventWriterT' action.
 runEventWriterT :: forall t m w a. (Reflex t, Monad m, Semigroup w) => EventWriterT t w m a -> m (a, Event t w)
@@ -67,9 +84,6 @@ runEventWriterT (EventWriterT a) = do
 
 instance (Reflex t, Monad m, Semigroup w) => EventWriter t w (EventWriterT t w m) where
   tellEvent w = EventWriterT $ modify (<> Deferred.singleton w)
-
-instance MonadTrans (EventWriterT t w) where
-  lift = EventWriterT . lift
 
 instance MonadSample t m => MonadSample t (EventWriterT t w m) where
   sample = lift . sample
@@ -85,6 +99,8 @@ instance MonadHold t m => MonadHold t (EventWriterT t w m) where
   buildDynamic a0 = lift . buildDynamic a0
   {-# INLINABLE headE #-}
   headE = lift . headE
+  {-# INLINABLE now #-}
+  now = lift now
 
 instance (Reflex t, Adjustable t m, MonadHold t m, Semigroup w) => Adjustable t (EventWriterT t w m) where
   runWithReplace = runWithReplaceEventWriterTWith $ \dm0 dm' -> lift $ runWithReplace dm0 dm'

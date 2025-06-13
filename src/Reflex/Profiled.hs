@@ -28,13 +28,14 @@ import Control.Monad.Ref
 import Control.Monad.State.Strict (StateT, execStateT, modify)
 import Data.Bifunctor
 import Data.Coerce
-import Data.Dependent.Map (DMap, GCompare)
+import Data.Dependent.Map (DMap)
+import Data.GADT.Compare (GCompare)
 import Data.FastMutableIntMap
 import Data.IORef
 import Data.List
+import Data.Kind (Type)
 import Data.Map (Map)
 import qualified Data.Map.Strict as Map
-import Data.Monoid ((<>))
 import Data.Ord
 import Data.Profunctor.Unsafe ((#.))
 import qualified Data.Semigroup as S
@@ -146,7 +147,7 @@ instance Reflex t => Reflex (ProfiledTimeline t) where
   pushCheap f (Event_Profiled e) = coerce $ pushCheap (coerce f) $ profileEvent e
   pull = Behavior_Profiled . pull . coerce
   fanG (Event_Profiled e) = EventSelectorG $ coerce $ selectG (fanG $ profileEvent e)
-  mergeG :: forall (k :: z -> *) q v. GCompare k
+  mergeG :: forall z (k :: z -> Type) q v. GCompare k
     => (forall a. q a -> Event (ProfiledTimeline t) (v a))
     -> DMap k q -> Event (ProfiledTimeline t) (DMap k v)
   mergeG nt = Event_Profiled #. mergeG (coerce nt)
@@ -183,6 +184,7 @@ instance MonadHold t m => MonadHold (ProfiledTimeline t) (ProfiledM m) where
   holdIncremental v0 (Event_Profiled v') = ProfiledM $ Incremental_Profiled <$> holdIncremental v0 v'
   buildDynamic (ProfiledM v0) (Event_Profiled v') = ProfiledM $ Dynamic_Profiled <$> buildDynamic v0 v'
   headE (Event_Profiled e) = ProfiledM $ Event_Profiled <$> headE e
+  now = ProfiledM $ Event_Profiled <$> now
 
 instance MonadSample t m => MonadSample (ProfiledTimeline t) (ProfiledM m) where
   sample (Behavior_Profiled b) = ProfiledM $ sample b

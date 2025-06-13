@@ -182,11 +182,13 @@ import Prelude hiding (zip, zipWith)
 import Data.These.Combinators (justThese)
 #endif
 #if MIN_VERSION_semialign(1,1,0)
-import Data.Zip (Zip (..))
+import Data.Zip (Zip (..), Unzip (..))
 #endif
 #endif
 
 import Control.Applicative
+import Control.Monad
+import Control.Monad.Fix
 import Control.Monad.Identity
 import Control.Monad.Reader
 import Control.Monad.State.Strict
@@ -198,18 +200,19 @@ import Data.Align
 import Data.Bifunctor
 import Data.Coerce
 import Data.Default
-import Data.Dependent.Map (DMap, DSum (..))
+import Data.Dependent.Map (DMap)
+import Data.Dependent.Sum (DSum (..))
 import qualified Data.Dependent.Map as DMap
 import Data.Functor.Compose
 import Data.Functor.Product
 import Data.GADT.Compare (GEq (..), GCompare (..))
-import Data.FastMutableIntMap (PatchIntMap)
 import Data.Foldable
 import Data.Functor.Bind
 import Data.Functor.Misc
 import Data.Functor.Plus
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
+import Data.Kind (Type)
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -219,12 +222,12 @@ import Data.String
 import Data.These
 import Data.Type.Coercion
 import Data.Type.Equality ((:~:) (..))
-import Data.Witherable (Filterable(..))
-import qualified Data.Witherable as W
 import Reflex.FunctorMaybe (FunctorMaybe)
 import qualified Reflex.FunctorMaybe
 import Data.Patch
 import qualified Data.Patch.MapWithMove as PatchMapWithMove
+import Witherable (Filterable(..))
+import qualified Witherable as W
 
 import Debug.Trace (trace)
 
@@ -242,25 +245,25 @@ class ( MonadHold t (PushM t)
       ) => Reflex t where
   -- | A container for a value that can change over time.  'Behavior's can be
   -- sampled at will, but it is not possible to be notified when they change
-  data Behavior t :: * -> *
+  data Behavior t :: Type -> Type
   -- | A stream of occurrences.  During any given frame, an 'Event' is either
   -- occurring or not occurring; if it is occurring, it will contain a value of
   -- the given type (its "occurrence type")
-  data Event t :: * -> *
+  data Event t :: Type -> Type
   -- | A container for a value that can change over time and allows
   -- notifications on changes.  Basically a combination of a 'Behavior' and an
   -- 'Event', with a rule that the 'Behavior' will change if and only if the
   -- 'Event' fires.
-  data Dynamic t :: * -> *
+  data Dynamic t :: Type -> Type
   -- | An 'Incremental' is a more general form of  a 'Dynamic'.
   -- Instead of always fully replacing the value, only parts of it can be patched.
   -- This is only needed for performance critical code via `mergeIncremental` to make small
   -- changes to large values.
-  data Incremental t :: * -> *
+  data Incremental t :: Type -> Type
   -- | A monad for doing complex push-based calculations efficiently
-  type PushM t :: * -> *
+  type PushM t :: Type -> Type
   -- | A monad for doing complex pull-based calculations efficiently
-  type PullM t :: * -> *
+  type PullM t :: Type -> Type
   -- | An 'Event' with no occurrences
   never :: Event t a
   -- | Create a 'Behavior' that always has the given value
@@ -423,6 +426,13 @@ class MonadSample t m => MonadHold t m where
   -- | Create a new 'Event' that only occurs only once, on the first occurrence of
   -- the supplied 'Event'.
   headE :: Event t a -> m (Event t a)
+  -- | An event which only occurs at the current moment in time, such that:
+  --
+  -- > coincidence (pushAlways (\a -> (a <$) <$> now) e) = e
+  --
+  now :: m (Event t ())
+  default now :: (m ~ f m', MonadTrans f, MonadHold t m') => m (Event t ())
+  now = lift now
 
 -- | Accumulate an 'Incremental' with the supplied initial value and the firings of the provided 'Event',
 -- using the combining function to produce a patch.
@@ -568,6 +578,7 @@ instance MonadHold t m => MonadHold t (ReaderT r m) where
   holdIncremental a0 = lift . holdIncremental a0
   buildDynamic a0 = lift . buildDynamic a0
   headE = lift . headE
+  now = lift now
 
 instance (MonadSample t m, Monoid r) => MonadSample t (WriterT r m) where
   sample = lift . sample
@@ -578,6 +589,7 @@ instance (MonadHold t m, Monoid r) => MonadHold t (WriterT r m) where
   holdIncremental a0 = lift . holdIncremental a0
   buildDynamic a0 = lift . buildDynamic a0
   headE = lift . headE
+  now = lift now
 
 instance MonadSample t m => MonadSample t (StateT s m) where
   sample = lift . sample
@@ -588,6 +600,7 @@ instance MonadHold t m => MonadHold t (StateT s m) where
   holdIncremental a0 = lift . holdIncremental a0
   buildDynamic a0 = lift . buildDynamic a0
   headE = lift . headE
+  now = lift now
 
 instance MonadSample t m => MonadSample t (ExceptT e m) where
   sample = lift . sample
@@ -598,6 +611,7 @@ instance MonadHold t m => MonadHold t (ExceptT e m) where
   holdIncremental a0 = lift . holdIncremental a0
   buildDynamic a0 = lift . buildDynamic a0
   headE = lift . headE
+  now = lift now
 
 instance (MonadSample t m, Monoid w) => MonadSample t (RWST r w s m) where
   sample = lift . sample
@@ -608,6 +622,7 @@ instance (MonadHold t m, Monoid w) => MonadHold t (RWST r w s m) where
   holdIncremental a0 = lift . holdIncremental a0
   buildDynamic a0 = lift . buildDynamic a0
   headE = lift . headE
+  now = lift now
 
 instance MonadSample t m => MonadSample t (ContT r m) where
   sample = lift . sample
@@ -618,6 +633,7 @@ instance MonadHold t m => MonadHold t (ContT r m) where
   holdIncremental a0 = lift . holdIncremental a0
   buildDynamic a0 = lift . buildDynamic a0
   headE = lift . headE
+  now = lift now
 
 --------------------------------------------------------------------------------
 -- Convenience functions
@@ -666,14 +682,17 @@ instance (Reflex t, IsString a) => IsString (Behavior t a) where
 instance Reflex t => Monad (Behavior t) where
   a >>= f = pull $ sample a >>= sample . f
   -- Note: it is tempting to write (_ >> b = b); however, this would result in (fail x >> return y) succeeding (returning y), which violates the law that (a >> b = a >>= \_ -> b), since the implementation of (>>=) above actually will fail.  Since we can't examine 'Behavior's other than by using sample, I don't think it's possible to write (>>) to be more efficient than the (>>=) above.
-  return = constant
 #if !MIN_VERSION_base(4,13,0)
   fail = error "Monad (Behavior t) does not support fail"
 #endif
 
+instance (Reflex t, Semigroup a) => Semigroup (Behavior t a) where
+  a <> b = pull $ liftM2 (<>) (sample a) (sample b)
+  sconcat = pull . fmap sconcat . mapM sample
+  stimes n = fmap $ stimes n
+
 instance (Reflex t, Monoid a) => Monoid (Behavior t a) where
   mempty = constant mempty
-  mappend a b = pull $ liftM2 mappend (sample a) (sample b)
   mconcat = pull . fmap mconcat . mapM sample
 
 instance (Reflex t, Num a) => Num (Behavior t a) where
@@ -693,11 +712,6 @@ instance (Num a, Reflex t) => Num (Dynamic t a) where
   fromInteger = pure . fromInteger
   negate = fmap negate
   (-) = liftA2 (-)
-
-instance (Reflex t, Semigroup a) => Semigroup (Behavior t a) where
-  a <> b = pull $ liftM2 (<>) (sample a) (sample b)
-  sconcat = pull . fmap sconcat . mapM sample
-  stimes n = fmap $ stimes n
 
 -- | Alias for 'mapMaybe'
 fmapMaybe :: Filterable f => (a -> Maybe b) -> f a -> f b
@@ -1106,6 +1120,12 @@ instance Reflex t => Zip (Event t) where
   zip x y = mapMaybe justThese $ align x y
 #endif
 
+#ifdef MIN_VERSION_semialign
+#if MIN_VERSION_semialign(1,1,0)
+instance Reflex t => Unzip (Event t) where
+  unzip = splitE
+#endif
+#endif
 
 -- | Create a new 'Event' that only occurs if the supplied 'Event' occurs and
 -- the 'Behavior' is true at the time of occurrence.
@@ -1151,7 +1171,6 @@ instance (Reflex t, Semigroup a) => Semigroup (Dynamic t a) where
 instance (Reflex t, Monoid a) => Monoid (Dynamic t a) where
   mconcat = distributeListOverDynWith mconcat
   mempty = constDyn mempty
-  mappend = zipDynWith mappend
 
 -- | This function converts a 'DMap' whose elements are 'Dynamic's into a
 -- 'Dynamic' 'DMap'.  Its implementation is more efficient than doing the same

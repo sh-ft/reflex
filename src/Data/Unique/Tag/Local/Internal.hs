@@ -14,6 +14,7 @@ import Data.Primitive.MutVar
 import Data.GADT.Compare
 import Data.Some
 import GHC.Exts (Int (..), Int#, MutVar#, unsafeCoerce#)
+import Type.Reflection
 
 import Unsafe.Coerce
 

@@ -8,6 +8,7 @@
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 #ifdef USE_REFLEX_OPTIMIZER
 {-# OPTIONS_GHC -fplugin=Reflex.Optimizer #-}
@@ -42,6 +43,7 @@ import qualified Control.Monad.Trans.State.Strict as Strict
 import Control.Monad.Trans.Writer (WriterT)
 import Data.Dependent.Sum (DSum (..))
 import Data.GADT.Compare
+import Data.Kind (Type)
 
 -- | Framework implementation support class for the reflex implementation
 -- represented by @t@.
@@ -52,9 +54,9 @@ class ( Reflex t
       , MonadFix (HostFrame t)
       , MonadSubscribeEvent t (HostFrame t)
       ) => ReflexHost t where
-  type EventTrigger t :: * -> *
-  type EventHandle t :: * -> *
-  type HostFrame t :: * -> *
+  type EventTrigger t :: Type -> Type
+  type EventHandle t :: Type -> Type
+  type HostFrame t :: Type -> Type
 
 -- | Monad in which Events can be 'subscribed'.  This forces all underlying
 -- event sources to be initialized, so that the event will fire whenever it
@@ -114,7 +116,7 @@ class ( ReflexHost t
       , MonadSample t (ReadPhase m)
       , MonadHold t (ReadPhase m)
       ) => MonadReflexHost t m | m -> t where
-  type ReadPhase m :: * -> *
+  type ReadPhase m :: Type -> Type
   -- | Propagate some events firings and read the values of events afterwards.
   --
   -- This function will create a new frame to fire the given events. It will

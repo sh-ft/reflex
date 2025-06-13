@@ -15,6 +15,7 @@ module Reflex.Requester.Base
   , singletonRequestData
   , singletonResponseData
   , matchResponsesWithRequests
+--  , matchResponseMapWithRequests
 --  , multiEntry
 --  , unMultiEntry
 --  , requesting'
