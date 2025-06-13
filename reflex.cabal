@@ -74,7 +74,6 @@ library
     base >= 4.11 && < 4.22,
     bifunctors >= 5.2 && < 5.7,
     comonad >= 5.0.4 && < 5.1,
-    dlist == 0.8.*,
     commutative-semigroups >= 0.1 && <0.3,
     constraints >= 0.10 && <0.15,
     constraints-extras >= 0.3 && < 0.5,
