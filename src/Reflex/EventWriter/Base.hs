@@ -26,6 +26,7 @@ import Reflex.Adjustable.Class
 import Reflex.Class
 import Reflex.EventWriter.Class (EventWriter, tellEvent)
 import Reflex.DynamicWriter.Class (DynamicWriter, tellDyn)
+import Reflex.BehaviorWriter.Class (BehaviorWriter, tellBehavior)
 import Reflex.Host.Class
 import Reflex.PerformEvent.Class
 import Reflex.PostBuild.Class
@@ -248,6 +249,9 @@ instance (MonadQuery t q m, Monad m) => MonadQuery t q (EventWriterT t w m) wher
 
 instance DynamicWriter t w m => DynamicWriter t w (EventWriterT t v m) where
   tellDyn = lift . tellDyn
+
+instance BehaviorWriter t w m => BehaviorWriter t w (EventWriterT t v m) where
+  tellBehavior = lift . tellBehavior
 
 instance PrimMonad m => PrimMonad (EventWriterT t w m) where
   type PrimState (EventWriterT t w m) = PrimState m
