@@ -24,11 +24,11 @@ import Test.Run
 
 main :: IO ()
 main = do
-  os1@[[Just [10,9,8,7,6,5,4,3,2,1]]] <- runApp' (unwrapApp testOrdering) $
+  os1@[[Just [1,2,3,4,5,6,7,8,9,10]]] <- runApp' (unwrapApp testOrdering) $
     [ Just ()
     ]
   print os1
-  os2@[[Just [1,3,5,7,9]],[Nothing,Nothing],[Just [2,4,6,8,10]],[Just [2,4,6,8,10],Nothing]]
+  os2@[[Just [9,7,5,3,1]],[Nothing,Nothing],[Just [10,8,6,4,2]],[Just [10,8,6,4,2],Nothing]]
     <- runApp' (unwrapApp testSimultaneous) $ map Just $
          [ This ()
          , That ()
