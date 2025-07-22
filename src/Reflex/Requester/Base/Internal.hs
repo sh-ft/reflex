@@ -63,6 +63,8 @@ import Data.Unique.Tag
 import GHC.Exts (Any)
 import Unsafe.Coerce
 
+import Debug.Trace (traceWith)
+
 --TODO: Make this module type-safe
 
 newtype TagMap (f :: Type -> Type) = TagMap (IntMap Any)
@@ -332,7 +334,10 @@ instance (Reflex t, Monad m) => Requester t (RequesterT t request response m) wh
   requesting_ = void . tagRequest . fmapCheap singleEntry
 
 {-# INLINE tagRequest #-}
-tagRequest :: forall m x t request response. (Monad m, MyTagTypeOffset x) => Event t (Entry request x) -> RequesterT t request response m (MyTagWrap request (Entry request x))
+tagRequest
+  :: forall m x t request response. (Monad m, MyTagTypeOffset x)
+  => Event t (Entry request x)
+  -> RequesterT t request response m (MyTagWrap request (Entry request x))
 tagRequest req = do
   old <- RequesterT get
   let n = _requesterState_nextMyTag old .|. myTagTypeOffset (Proxy :: Proxy x)
@@ -397,7 +402,7 @@ runWithReplaceRequesterTWith f a0 a' = do
   rec na' <- numberOccurrencesFrom 1 a'
       responses <- fmap (fmapCheap unMultiEntry) $ requesting' $ fmapCheap multiEntry $ switchPromptlyDyn requests --TODO: Investigate whether we can really get rid of the prompt stuff here
       let responses' = fanInt responses
-      ((result0, requests0), v') <- f (runRequesterT a0 (selectInt responses' 0)) $ fmapCheap (\(n, a) -> fmap ((,) n) $ runRequesterT a $ selectInt responses' n) na'
+      ((result0, requests0), v') <- f (runRequesterT a0 (selectInt responses' 0)) $ fmapCheap (\(n, a) -> traceWith (\_ -> "TRACE runWithReplace " <> show n) . fmap ((,) n) $ runRequesterT a $ selectInt responses' n) na'
       requests <- holdDyn (fmapCheap (IntMap.singleton 0) requests0) $ fmapCheap (\(n, (_, reqs)) -> fmapCheap (IntMap.singleton n) reqs) v'
   return (result0, fmapCheap (fst . snd) v')
 
@@ -480,7 +485,7 @@ traverseDMapWithKeyWithAdjustRequesterTWith base mapPatch weakenPatchWith patchN
           f' :: forall a. k a -> Compose ((,) Int) v a -> m (Compose ((,) (Event t (IntMap (RequesterData request)))) v' a)
           f' k (Compose (n, v)) = do
             (result, myRequests) <- runRequesterT (f k v) $ mapMaybeCheap (IntMap.lookup n) $ select responses (Const2 (Some k))
-            return $ Compose (fmapCheap (IntMap.singleton n) myRequests, result)
+            return . traceWith (\_ -> "TRACE traverseDMap... " <> show n) $ Compose (fmapCheap (IntMap.singleton n) myRequests, result)
       ndm' <- numberOccurrencesFrom 1 dm'
       (children0, children') <- base f' (DMap.map (\v -> Compose (0, v)) dm0) $ fmap (\(n, dm) -> mapPatch (\v -> Compose (n, v)) dm) ndm'
       let result0 = DMap.map (snd . getCompose) children0

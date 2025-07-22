@@ -2,7 +2,7 @@
 # select the version of ghc provided by reflex-platform, but you can choose a
 # later version from nixpkgs as well by doing:
 # $ nix-shell --argstr compiler "ghc943"
-{ compiler ? "reflex-platform" # or "ghc943", "ghc924"
+{ compiler ? "ghc945" # or "ghc943", "ghc924"
 }:
 let
   rp = import ./dep/reflex-platform { __useNewerCompiler = true; };
