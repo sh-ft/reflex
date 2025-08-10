@@ -46,6 +46,10 @@ import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Semigroup as S
 
+import Debug.Trace (traceWith)
+import Reflex.Requester.Base.Internal
+import qualified Data.IntMap.Strict as IntMap
+
 -- | A function that fires events for the given 'EventTrigger's and then runs
 -- any followup actions provided via 'PerformEvent'.  The given 'ReadPhase'
 -- action will be run once for the initial trigger execution as well as once for
@@ -143,7 +147,8 @@ hostPerformEventT a = do
           case mToPerform of
             Nothing -> return [result']
             Just toPerform -> do
-              responses <- runHostFrame $ traverseRequesterData (fmap Identity) toPerform
+              responses <- runHostFrame $ traverseRequesterData (fmap Identity) $
+                traceWith (\(RequesterData (TagMap m)) -> "performing events " <> show (IntMap.keys m)) toPerform
               mrt <- readRef responseTrigger
               let followupEventTriggers = case mrt of
                     Just rt -> [rt :=> Identity responses]

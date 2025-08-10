@@ -69,16 +69,40 @@ testPatchMapWithMove pulse = do
   let
     -- counterAction = ffor (updated counter) $ \t ->
     --   fromJust . patchMapWithMove $ Map.singleton 0 (NodeInfo (From_Insert t) Nothing)
+
     showItem k v n t = show k <> [v] <> show n <> show t
+
     child k v = do
       liftIO . putStrLn $ "child " <> show k <> [v]
       eCounter' <- performEvent $ ffor (updated counter) $ \t -> do
         liftIO . putStrLn $ "child counter " <> show k <> [v] <> "_" <> show t
         pure t
       counter' <- holdDyn (-1) eCounter'
-      d <- networkHold (c counter' 1) (c counter' <$> updated counter)
-      performEvent_ $ ffor (updated d) $ \s -> liftIO . putStrLn $ "child result " <> s
-      pure d
+
+      -- BUG: this one also stops working, just like the one inside `c`.
+      -- tellBehavior $ singleton . (\t -> "child " <> show k <> [v] <> "_" <> show t) <$> current counter'
+
+      -- But this one doesn't! So it's just `counter'`.
+      -- tellBehavior $ singleton . (\t -> "child " <> show k <> [v] <> "_" <> show t) <$> current counter
+
+      -- BUG: this one also stops working. Maybe it's the hold that stops working?
+      performEvent_ $ ffor (updated counter') $ \t -> liftIO . putStrLn $ "child counter' " <> show k <> [v] <> "_" <> show t
+
+      -- However, if we do this instead, it will start working. Then it might be that `eCounter' <- performEvent`
+      -- is being executed (since putStrLn is working), but its result isn't being output in the returned event.
+      -- counter' <- holdDyn (-1) $ ffor (updated counter) $ \t -> t + 80
+
+      -- BUG: Yes, that seems to be the case, since this one stops outputting. So it's not the hold, it's performEvent.
+      -- performEvent $ ffor (eCounter') $ \t -> do
+      --   liftIO . putStrLn $ "child eCounter' " <> show k <> [v] <> "_" <> show t
+      --   pure t
+
+      -- That means networkHold isn't even necessary to reproduce the bug, though it does seem to suffer from the same issue as performEvent.
+      -- d <- networkHold (c counter' 1) (c counter' <$> updated counter)
+      -- performEvent_ $ ffor (updated d) $ \s -> liftIO . putStrLn $ "child result " <> s
+      -- pure d
+
+      pure $ constDyn "."
       where
         c counter' n = do
           liftIO . putStrLn $ "c " <> show k <> [v] <> show n
@@ -99,7 +123,8 @@ testPatchMapWithMove pulse = do
 
           -- BUG: after the Swap, this behavior stops being updated and `current counter'` stays at 3.
           -- It means that while performEvent requests stay active (for the network version 3), tellBehavior and result aren't.
-          tellBehavior $ singleton . showItem k v n <$> current counter'
+          -- tellBehavior $ singleton . showItem k v n <$> current counter'
+          tellBehavior $ singleton . showItem k v n <$> current counter
 
           -- BUG: after the Swap, this result stops being output for k = 1 and 3.
           -- At the same time, the performEvent calls above keep outputting, but their n stays at 3, no longer increasing.
