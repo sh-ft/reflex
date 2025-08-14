@@ -477,6 +477,9 @@ traverseDMapWithKeyWithAdjustRequesterTWith :: forall k t request response m v v
 traverseDMapWithKeyWithAdjustRequesterTWith base mapPatch weakenPatchWith patchNewElements mergePatchIncremental f dm0 dm' = do
   rec response <- requesting' $ fmapCheap pack $ promptRequests `mappend` mergePatchIncremental requests --TODO: Investigate whether we can really get rid of the prompt stuff here
       let responses :: EventSelector t (Const2 (Some k) (IntMap (RequesterData response)))
+          -- ^ Some k - list item key
+          -- ^ IntMap - list item version
+          -- ^ RequesterData->IntMap - individual `requesting` call (request channel)
           responses = fanMap $ fmapCheap unpack response
           unpack :: Entry response (Multi2 k) -> Map (Some k) (IntMap (RequesterData response))
           unpack = _multi2Contents_values . unEntry
@@ -484,10 +487,15 @@ traverseDMapWithKeyWithAdjustRequesterTWith base mapPatch weakenPatchWith patchN
           pack m = Entry $ Multi2Contents { _multi2Contents_values = m, _multi2Contents_dict = Dict }
           f' :: forall a. k a -> Compose ((,) Int) v a -> m (Compose ((,) (Event t (IntMap (RequesterData request)))) v' a)
           f' k (Compose (n, v)) = do
-            (result, myRequests) <- runRequesterT (f k v) $ mapMaybeCheap (IntMap.lookup n) $ select responses (Const2 (Some k))
-            return . traceWith (\_ -> "traverseDMap " <> show n) $ Compose (fmapCheap (IntMap.singleton n) myRequests, result)
+            -- TODO: test if 1b0 still exists by tracing events here
+            (result, myRequests) <- runRequesterT (f k v) $
+              mapMaybeCheap (IntMap.lookup n) $ traceEventWith (\m -> "resp " <> show (IntMap.keys m) <> " " <> show n) $ select responses (Const2 (Some k))
+            return . traceWith (\_ -> "traverseDMap f' " <> show n) $
+              Compose (traceEventWith (\_ -> "req " <> show n) $ fmapCheap (IntMap.singleton n) myRequests, result)
       ndm' <- numberOccurrencesFrom 1 dm'
-      (children0, children') <- base f' (DMap.map (\v -> Compose (0, v)) dm0) $ fmap (\(n, dm) -> mapPatch (\v -> Compose (n, v)) dm) ndm'
+      (children0, children') <- base f'
+        (DMap.map (\v -> Compose (0, v)) dm0) $
+        fmap (\(n, dm) -> mapPatch (\v -> Compose (n, v)) dm) ndm'
       let result0 = DMap.map (snd . getCompose) children0
           result' = fforCheap children' $ mapPatch $ snd . getCompose
           requests0 :: Map (Some k) (Event t (IntMap (RequesterData request)))

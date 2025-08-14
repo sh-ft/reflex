@@ -22,7 +22,6 @@ import Test.Run
 
 main :: IO ()
 main = do
-  -- let actions =  [ Increment, Update, Increment, Swap, Increment, Increment ]
   let actions =  [ Increment, Update, Increment, Swap, Increment, Increment, Increment  ]
   os <- runAppB testPatchMapWithMove $ map Just actions
   -- If the final counter value in the adjusted widgets corresponds to the number of times it has
@@ -66,6 +65,7 @@ testPatchMapWithMove pulse = do
         Update2 -> patchMapWithMove $ Map.fromList
           [ (3, NodeInfo (From_Insert 'y') Nothing) ]
   counter <- foldDyn (+) 1 $ fmapMaybe (\e -> if isNothing e then Just 1 else Nothing) pulseAction
+  performEvent_ $ ffor pulse $ \p -> liftIO . putStrLn $ "pulse " <> show p
   let
     -- counterAction = ffor (updated counter) $ \t ->
     --   fromJust . patchMapWithMove $ Map.singleton 0 (NodeInfo (From_Insert t) Nothing)
@@ -75,9 +75,10 @@ testPatchMapWithMove pulse = do
     child k v = do
       liftIO . putStrLn $ "child " <> show k <> [v]
       eCounter' <- performEvent $ ffor (updated counter) $ \t -> do
-        liftIO . putStrLn $ "child counter " <> show k <> [v] <> "_" <> show t
+        liftIO . putStrLn $ "child performEvent counter " <> show k <> [v] <> "_" <> show t
         pure t
-      counter' <- holdDyn (-1) eCounter'
+      -- BUG: this traceEventWith stops outputting 1z and 3d after the swap, but weirdly keeps outputting 1b.
+      counter' <- holdDyn (-1) $ traceEventWith (\t -> "child eCounter' " <> show k <> [v] <> "_" <> show t) eCounter'
 
       -- BUG: this one also stops working, just like the one inside `c`.
       -- tellBehavior $ singleton . (\t -> "child " <> show k <> [v] <> "_" <> show t) <$> current counter'
@@ -86,23 +87,23 @@ testPatchMapWithMove pulse = do
       -- tellBehavior $ singleton . (\t -> "child " <> show k <> [v] <> "_" <> show t) <$> current counter
 
       -- BUG: this one also stops working. Maybe it's the hold that stops working?
-      performEvent_ $ ffor (updated counter') $ \t -> liftIO . putStrLn $ "child counter' " <> show k <> [v] <> "_" <> show t
+      performEvent_ $ ffor (updated counter') $ \t -> liftIO . putStrLn $ "child performEvent counter' " <> show k <> [v] <> "_" <> show t
 
       -- However, if we do this instead, it will start working. Then it might be that `eCounter' <- performEvent`
       -- is being executed (since putStrLn is working), but its result isn't being output in the returned event.
       -- counter' <- holdDyn (-1) $ ffor (updated counter) $ \t -> t + 80
 
       -- BUG: Yes, that seems to be the case, since this one stops outputting. So it's not the hold, it's performEvent.
-      -- performEvent $ ffor (eCounter') $ \t -> do
-      --   liftIO . putStrLn $ "child eCounter' " <> show k <> [v] <> "_" <> show t
-      --   pure t
+      performEvent $ ffor eCounter' $ \t -> do
+        liftIO . putStrLn $ "child performEvent eCounter' " <> show k <> [v] <> "_" <> show t
+        pure t
 
       -- That means networkHold isn't even necessary to reproduce the bug, though it does seem to suffer from the same issue as performEvent.
       -- d <- networkHold (c counter' 1) (c counter' <$> updated counter)
       -- performEvent_ $ ffor (updated d) $ \s -> liftIO . putStrLn $ "child result " <> s
       -- pure d
 
-      pure $ constDyn "."
+      pure $ "child" <> show k <> [v]
       where
         c counter' n = do
           liftIO . putStrLn $ "c " <> show k <> [v] <> show n
@@ -154,12 +155,23 @@ testPatchMapWithMove pulse = do
       (Map.fromList $ zip [0..] "abcde")
       (fmapMaybe id pulseAction)
 
-    r <- holdIncremental r0 r'
+    let
+      tracePatch (PatchMapWithMove m) = "r' " <> show m
+    r <- holdIncremental r0 $ traceEventWith tracePatch r'
+
+    -- r' :: Event t (PatchMapWithMove Integer (Dynamic t String))
 
     -- performEvent_ . ffor (pushAlways (sample . current . fromJust . Map.lookup 0) $ updated (incrementalToDynamic r)) $ liftIO . print
-    performEvent_ . ffor (updated $ fromJust . Map.lookup 1 =<< incrementalToDynamic r) $ liftIO . putStrLn . ("result1 " <>)
-    performEvent_ . ffor (updated $ fromJust . Map.lookup 3 =<< incrementalToDynamic r) $ liftIO . putStrLn . ("result3 " <>)
-    performEvent_ . ffor (updated $ fromJust . Map.lookup 0 =<< incrementalToDynamic r) $ liftIO . putStrLn . ("result0 " <>)
+
+    -- performEvent_ . ffor (updated $ fromJust . Map.lookup 1 =<< incrementalToDynamic r) $ liftIO . putStrLn . ("result1 " <>)
+    -- performEvent_ . ffor (updated $ fromJust . Map.lookup 3 =<< incrementalToDynamic r) $ liftIO . putStrLn . ("result3 " <>)
+    -- performEvent_ . ffor (updated $ fromJust . Map.lookup 0 =<< incrementalToDynamic r) $ liftIO . putStrLn . ("result0 " <>)
+
+    performEvent_ . ffor (updated $ fromJust . Map.lookup 1 <$> incrementalToDynamic r) $ liftIO . putStrLn . ("result1 " <>)
+    performEvent_ . ffor (updated $ fromJust . Map.lookup 3 <$> incrementalToDynamic r) $ liftIO . putStrLn . ("result3 " <>)
+    performEvent_ . ffor (updated $ fromJust . Map.lookup 0 <$> incrementalToDynamic r) $ liftIO . putStrLn . ("result0 " <>)
+
+    performEvent_ . ffor (updated $ incrementalToDynamic r) $ liftIO . putStrLn . ("r " <>) . show
 
     return ()
   return result
