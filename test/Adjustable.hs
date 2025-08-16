@@ -152,7 +152,7 @@ testPatchMapWithMove pulse = do
 
       -- (\_ _ -> tellBehavior $ singleton <$> current counter)
 
-      (Map.fromList $ zip [0..] "abcde")
+      (Map.fromList $ zip [(0 :: Int)..] "abcde")
       (fmapMaybe id pulseAction)
 
     let

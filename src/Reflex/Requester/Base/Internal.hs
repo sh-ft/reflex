@@ -475,7 +475,8 @@ traverseDMapWithKeyWithAdjustRequesterTWith :: forall k t request response m v v
                                      -> Event t (p k v)
                                      -> RequesterT t request response m (DMap k v', Event t (p k v'))
 traverseDMapWithKeyWithAdjustRequesterTWith base mapPatch weakenPatchWith patchNewElements mergePatchIncremental f dm0 dm' = do
-  rec response <- requesting' $ fmapCheap pack $ promptRequests `mappend` mergePatchIncremental requests --TODO: Investigate whether we can really get rid of the prompt stuff here
+  rec let mergedRequests = promptRequests `mappend` mergePatchIncremental requests
+      response <- requesting' $ fmapCheap pack mergedRequests --TODO: Investigate whether we can really get rid of the prompt stuff here
       let responses :: EventSelector t (Const2 (Some k) (IntMap (RequesterData response)))
           -- ^ Some k - list item key
           -- ^ IntMap - list item version
@@ -484,14 +485,21 @@ traverseDMapWithKeyWithAdjustRequesterTWith base mapPatch weakenPatchWith patchN
           unpack :: Entry response (Multi2 k) -> Map (Some k) (IntMap (RequesterData response))
           unpack = _multi2Contents_values . unEntry
           pack :: Map (Some k) (IntMap (RequesterData request)) -> Entry request (Multi2 k)
-          pack m = Entry $ Multi2Contents { _multi2Contents_values = m, _multi2Contents_dict = Dict }
+          pack m = Entry $ Multi2Contents { _multi2Contents_values = (traceWith (("pack " <>) . show . fmap IntMap.keys . Map.elems) m), _multi2Contents_dict = Dict }
           f' :: forall a. k a -> Compose ((,) Int) v a -> m (Compose ((,) (Event t (IntMap (RequesterData request)))) v' a)
           f' k (Compose (n, v)) = do
             -- TODO: test if 1b0 still exists by tracing events here
+            -- let test = traceEventWith (\x -> "@@ " <> show x) $ fmap IntMap.keys . Map.lookup (Some k) <$> mergedRequests
             (result, myRequests) <- runRequesterT (f k v) $
-              mapMaybeCheap (IntMap.lookup n) $ traceEventWith (\m -> "resp " <> show (IntMap.keys m) <> " " <> show n) $ select responses (Const2 (Some k))
+              mapMaybeCheap (IntMap.lookup n)
+                $ traceEventWith (\m -> "resp " <> show (IntMap.keys m) <> " " <> [unsafeCoerce v :: Char] <> show n)
+                $ select responses (Const2 (Some k))
             return . traceWith (\_ -> "traverseDMap f' " <> show n) $
-              Compose (traceEventWith (\_ -> "req " <> show n) $ fmapCheap (IntMap.singleton n) myRequests, result)
+              Compose
+                ( traceEventWith (\_ -> "req " <> [unsafeCoerce v :: Char] <> show n) $
+                    fmapCheap (IntMap.singleton n) myRequests
+                , result
+                )
       ndm' <- numberOccurrencesFrom 1 dm'
       (children0, children') <- base f'
         (DMap.map (\v -> Compose (0, v)) dm0) $
