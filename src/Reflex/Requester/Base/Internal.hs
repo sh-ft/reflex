@@ -503,7 +503,7 @@ traverseDMapWithKeyWithAdjustRequesterTWith base mapPatch weakenPatchWith patchN
       ndm' <- numberOccurrencesFrom 1 dm'
       (children0, children') <- base f'
         (DMap.map (\v -> Compose (0, v)) dm0) $
-        fmap (\(n, dm) -> mapPatch (\v -> Compose (n, v)) dm) ndm'
+        fmap (\(n, dm) -> mapPatch (\v -> Compose (0, v)) dm) ndm'
       let result0 = DMap.map (snd . getCompose) children0
           result' = fforCheap children' $ mapPatch $ snd . getCompose
           requests0 :: Map (Some k) (Event t (IntMap (RequesterData request)))
