@@ -81,7 +81,7 @@ newtype EventWriterT t w m a = EventWriterT { unEventWriterT :: StateT (Deferred
 runEventWriterT :: forall t m w a. (Reflex t, Monad m, Semigroup w) => EventWriterT t w m a -> m (a, Event t w)
 runEventWriterT (EventWriterT a) = do
   (result, requests) <- runStateT a mempty
-  return (result, mconcatCheap $ Deferred.toList requests)
+  return (result, mconcatCheap . reverse $ Deferred.toList requests)
 
 instance (Reflex t, Monad m, Semigroup w) => EventWriter t w (EventWriterT t w m) where
   tellEvent w = EventWriterT $ modify (<> Deferred.singleton w)
