@@ -37,6 +37,7 @@ import Control.Monad.Primitive
 import Control.Monad.Reader
 import Control.Monad.Ref
 import Control.Monad.State
+import Control.Monad.Fix
 import Control.Monad.Catch (MonadMask, MonadThrow, MonadCatch)
 import Data.Coerce
 import Data.Dependent.Sum (DSum (..))
@@ -52,7 +53,7 @@ import qualified Data.TagMap as TagMap
 import Reflex.FanTag
 import Data.Unique.Tag.Local
 import Data.GADT.Compare
-import Data.Witherable
+import Witherable
 
 import Unsafe.Coerce
 

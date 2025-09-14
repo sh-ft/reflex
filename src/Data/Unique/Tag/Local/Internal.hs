@@ -13,7 +13,7 @@ import Control.Monad.Primitive
 import Data.Primitive.MutVar
 import Data.GADT.Compare
 import Data.Some
-import GHC.Exts (Int (..), Int#, MutVar#, unsafeCoerce#)
+import GHC.Exts (Int (..), Int#, MutVar#)
 import Data.Typeable ((:~:)(Refl))
 
 import Unsafe.Coerce
@@ -35,7 +35,8 @@ unsafeTagFromId = Tag
 newtype TagGen ps s = TagGen { unTagGen :: MutVar ps Int }
 
 instance Show (TagGen ps s) where
-  show (TagGen (MutVar m)) = show $ I# ((unsafeCoerce# :: MutVar# ps Int -> Int#) m)
+  -- TODO: fix this not building on recent GHC versions
+  show (TagGen (MutVar m)) = undefined -- show $ I# ((unsafeCoerce# :: MutVar# ps Int -> Int#) m)
 
 instance GEq (TagGen ps) where
   TagGen a `geq` TagGen b =
