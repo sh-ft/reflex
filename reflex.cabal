@@ -400,6 +400,23 @@ test-suite Adjustable2
   other-modules:
     Test.Run
 
+test-suite PerformEventPerf
+  default-language: Haskell2010
+  type: exitcode-stdio-1.0
+  main-is: PerformEventPerf.hs
+  hs-source-dirs: test
+  build-depends: base
+               , containers
+               , dependent-sum
+               , reflex
+               , ref-tf
+               , these
+               , patch
+               , time
+
+  other-modules:
+    Test.Run
+
 test-suite QueryT
   default-language: Haskell2010
   type: exitcode-stdio-1.0
