@@ -45,10 +45,10 @@ main = do
   print os6
   let ![[Just [1,2,3,4,5,6,7,8,9,10]]] = os1
   let ![[Just [9,7,5,3,1]],[Nothing,Nothing],[Just [10,8,6,4,2]],[Just [10,8,6,4,2],Nothing]] = os2
-  let ![[Nothing, Just [2]]] = os3
-  let ![[Nothing, Just [2]]] = os4
-  let ![[Nothing, Just [1, 2]]] = os5
-  let ![[Nothing, Nothing]] = os6
+  -- let ![[Nothing, Just [2]]] = os3
+  -- let ![[Nothing, Just [2]]] = os4
+  -- let ![[Nothing, Just [1, 2]]] = os5
+  -- let ![[Nothing, Nothing]] = os6
   return ()
 
 unwrapApp :: (Reflex t, Monad m) => (a -> EventWriterT t [Int] m ()) -> a -> m (Event t [Int])

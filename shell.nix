@@ -27,6 +27,7 @@ in
     buildInputs = [
       pkgs.cabal-install
       pkgs.ghcid
+      nixpkgsGhc.haskell-language-server
     ];
     inputsFrom = [
       reflexEnv
