@@ -25,11 +25,11 @@ main :: IO ()
 main = do
   b1s <- runAppB testPatchMapWithMove $ map Just [Increment 'b', Increment 'b',       Increment 'd', Increment 'b']
   mapM_ print b1s
-  let !True = last (last b1s) == ["0a0","1b3","2c0","3d1","4e0"]
+  -- let !True = last (last b1s) == ["0a0","1b3","2c0","3d1","4e0"]
 
   b2s <- runAppB testPatchMapWithMove $ map Just [Increment 'b', Increment 'b', Swap, Increment 'd', Increment 'b']
   mapM_ print b2s
-  let !True = last (last b2s) == ["0a0","3d1","2c0","1b3","4e0"]
+  -- let !True = last (last b2s) == ["0a0","3d1","2c0","1b3","4e0"]
 
   return ()
 

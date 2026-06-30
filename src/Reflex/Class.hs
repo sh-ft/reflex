@@ -1043,7 +1043,7 @@ switchHoldPromptOnly e0 e' = do
   eLag <- switch <$> hold e0 e'
   -- return $ coincidence $ leftmost [e', eLag <$ eLag]
   -- return $ coincidence e' -- this is the minimal implementation that still causes slowness
-  return $ trace "switchHoldPromptOnly" $ fmapMaybeCheap id $ leftmost
+  return $ fmapMaybeCheap id $ leftmost
     [ fmapCheap Just $ coincidence e'
     , fmapCheap (const Nothing) e'
     , fmapCheap Just eLag

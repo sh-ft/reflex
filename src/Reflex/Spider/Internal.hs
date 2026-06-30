@@ -704,7 +704,7 @@ behaviorPull !p = Behavior $ do
     case val of
       Just subscribed -> do
         askParentsRef >>= mapM_ (\r -> liftIO $ modifyIORef' r (SomeBehaviorSubscribed (Some (BehaviorSubscribedPull subscribed)) :))
-        askInvalidator >>= mapM_ (\wi -> liftIO $ addInvalidatorAmortized (pullSubscribedInvalidators subscribed) wi)
+        askInvalidator >>= mapM_ (liftIO . addInvalidatorAmortized (pullSubscribedInvalidators subscribed))
         liftIO $ touch $ pullSubscribedOwnInvalidator subscribed
         return $ pullSubscribedValue subscribed
       Nothing -> do
@@ -733,7 +733,7 @@ behaviorDyn !d = Behavior $ readHoldTracked =<< getDynHold d
 readHoldTracked :: Hold x p -> BehaviorM x (PatchTarget p)
 readHoldTracked h = do
   result <- liftIO $ readIORef $ holdValue h
-  askInvalidator >>= mapM_ (\wi -> liftIO $ addInvalidatorAmortized (holdInvalidators h) wi)
+  askInvalidator >>= mapM_ (liftIO . addInvalidatorAmortized (holdInvalidators h))
   askParentsRef >>= mapM_ (\r -> liftIO $ modifyIORef' r (SomeBehaviorSubscribed (Some (BehaviorSubscribedHold h)) :))
   liftIO $ touch h -- Otherwise, if this gets inlined enough, the hold's parent reference may get collected
   return result
