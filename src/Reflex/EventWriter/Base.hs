@@ -60,6 +60,8 @@ import Data.Semigroup
 import Data.Some (Some)
 import Data.Tuple
 
+import Debug.Trace (trace)
+
 -- | A basic implementation of 'EventWriter'.
 newtype EventWriterT t w m a = EventWriterT { unEventWriterT :: StateT (Deferred (Event t w)) m a }
   deriving
@@ -81,7 +83,7 @@ newtype EventWriterT t w m a = EventWriterT { unEventWriterT :: StateT (Deferred
 runEventWriterT :: forall t m w a. (Reflex t, Monad m, Semigroup w) => EventWriterT t w m a -> m (a, Event t w)
 runEventWriterT (EventWriterT a) = do
   (result, requests) <- runStateT a mempty
-  return (result, mconcatCheap . reverse $ Deferred.toList requests)
+  trace "runEventWriterT test" $ return (trace "runEvenwWriter result" result, mconcatCheap . reverse . trace "runEventWriter Deferred.toList" $ Deferred.toList requests)
 
 instance (Reflex t, Monad m, Semigroup w) => EventWriter t w (EventWriterT t w m) where
   tellEvent w = EventWriterT $ modify (<> Deferred.singleton w)
