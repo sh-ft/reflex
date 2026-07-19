@@ -20,19 +20,20 @@ import qualified Data.Map.Strict as M
 import Reflex
 import Reflex.EventWriter.Base
 import Reflex.Network
+import Reflex.Patch.MapWithMove
 import Test.Run
 
 main :: IO ()
 main = do
   start <- liftIO getCurrentTime
-  b1s <- runAppB testRunWithReplace $ map Just (replicate 10000 $ Increment 'a')
+  -- b1s <- runAppB testRunWithReplace $ map Just (replicate 10000 $ Increment 'a')
   -- b1s <- runAppB testRunWithReplace $ map Just (replicate 1 $ Increment 'a')
-  -- b1s <- runAppB testMapWithAdjustWithMove$ map Just (replicate 10000 $ Increment 'a')
+  b1s <- runAppB testMapWithAdjustWithMove $ map Just (replicate 10000 $ Increment 'a')
   mapM_ print b1s
-  -- let !False = last (last b1s) == ["0a0","1b3","2c0","3d1","4e0"]
+  let !False = last (last b1s) == ["0a0","1b3","2c0","3d1","4e0"]
   end <- liftIO getCurrentTime
   liftIO $ putStrLn $ "total runtime: " <> show (diffUTCTime end start)
-  -- let !False = True
+  let !False = True
   return ()
 
 data PatchMapTestAction
@@ -84,6 +85,7 @@ testRunWithReplace pulse = do
         -- void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
         -- void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
 
+        tellEvent $ ffor eMouseMotion (const ())
         end <- liftIO getCurrentTime
         liftIO $ putStrLn $ show (diffUTCTime end start)
         pure ()
@@ -92,10 +94,14 @@ testRunWithReplace pulse = do
       -- let eDebugHoverBoxAlpha = select esDebugHoverBoxAlpha (Const2 index)
       -- performEvent_ $ ffor eDebugHoverBoxAlpha $ const . liftIO $ putStrLn "selectDebugHoverBoxAlpha"
 
+      tellEvent $ ffor never (const ())
       void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
 
-  void $ cBigCard $ head initialCards
-  forM_ (tail initialCards) cSmallCard
+  (_, eWritten) <- runEventWriterT $ do
+    void $ cBigCard $ head initialCards
+    forM_ (tail initialCards) cSmallCard
+
+  performEvent_ $ ffor eWritten $ \p -> liftIO . putStrLn $ "eWritten " <> show p
 
   let result = constant []
   return result
@@ -129,7 +135,24 @@ testMapWithAdjustWithMove pulse = do
       void $ runWithReplace (pure ()) $ ffor eMouseMotion $ \_ -> do
         start <- liftIO getCurrentTime
 
+        (r0, r') <- mapMapWithAdjustWithMove
+          (\k v -> pure ())
+          (Map.fromList [(0, 0)])
+          never
+
         void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
+        -- void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
+        -- void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
+        -- void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
+        -- void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
+        -- void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
+        -- void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
+        -- void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
+        -- void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
+        -- void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
+        -- void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
+
+        tellEvent $ ffor never (const ())
 
         end <- liftIO getCurrentTime
         liftIO $ putStrLn $ show (diffUTCTime end start)
@@ -139,22 +162,33 @@ testMapWithAdjustWithMove pulse = do
       -- let eDebugHoverBoxAlpha = select esDebugHoverBoxAlpha (Const2 index)
       -- performEvent_ $ ffor eDebugHoverBoxAlpha $ const . liftIO $ putStrLn "selectDebugHoverBoxAlpha"
 
+      tellEvent $ ffor never (const ())
       void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
 
   -- void $ cBigCard $ head initialCards
   -- forM_ (tail initialCards) cSmallCard
 
-  (r0, r') <- mapMapWithAdjustWithMove
-    (\k v -> cBigCard k)
-    (Map.fromList $ [(0, 0)])
-    never
+  let
+    eMapAction = fforMaybe eMouseMotion $ const $ patchMapWithMove $ Map.singleton 0 $ NodeInfo (From_Insert 1) Nothing
 
-  -- forM_ (tail initialCards) cSmallCard
+  (_, eWritten) <- runEventWriterT $ do
+    (r0, r') <- mapMapWithAdjustWithMove
+      (\k v -> cBigCard k)
+      (Map.fromList $ [(0, 0)])
+      eMapAction
 
-  (r0, r') <- mapMapWithAdjustWithMove
-    (\k v -> cSmallCard k)
-    (Map.fromList $ zip (tail initialCards) (tail initialCards))
-    never
+    performEvent_ $ ffor r' $ \p -> liftIO . putStrLn $ "r' " <> show p
+
+    -- forM_ (tail initialCards) cSmallCard
+
+    (r0, r') <- mapMapWithAdjustWithMove
+      (\k v -> cSmallCard k)
+      (Map.fromList $ zip (tail initialCards) (tail initialCards))
+      never
+
+    performEvent_ $ ffor r' $ \p -> liftIO . putStrLn $ "r' " <> show p
+
+  performEvent_ $ ffor eWritten $ \p -> liftIO . putStrLn $ "eWritten " <> show p
 
   let result = constant []
   return result
