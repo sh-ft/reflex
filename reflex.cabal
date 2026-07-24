@@ -410,6 +410,27 @@ test-suite PerformEventPerf
   other-modules:
     Test.Run
 
+test-suite SpiderExploration
+  default-language: Haskell2010
+  type: exitcode-stdio-1.0
+  main-is: SpiderExploration.hs
+  hs-source-dirs: test
+  build-depends: base
+               , containers
+               , dependent-sum
+               , reflex
+               , ref-tf
+               , these
+               , patch
+               , time
+               , deepseq
+               , mtl
+
+  other-modules:
+    Reflex.Plan.Pure
+    Reflex.TestPlan
+    Test.Run
+
 test-suite QueryT
     type:             exitcode-stdio-1.0
     main-is:          QueryT.hs
