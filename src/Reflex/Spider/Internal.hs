@@ -286,7 +286,7 @@ subscribeAndRead = unEvent
 -- caching; if the computation function is very cheap, this is (much) more
 -- efficient than 'push'
 {-# INLINE [1] pushCheap #-}
-pushCheap :: forall (x :: Type) a b. HasSpiderTimeline x => (a -> ComputeM x (Maybe b)) -> Event x a -> Event x b
+pushCheap :: HasSpiderTimeline x => (a -> ComputeM x (Maybe b)) -> Event x a -> Event x b
 pushCheap !f e = Event $ \sub -> do
   wither f <=< subscribeAndRead e $ debugSubscriber' "push" $ sub
     { subscriberPropagate = \a -> do
@@ -317,7 +317,7 @@ data HeadEState x a
   | HeadEStateOccurred {-# UNPACK #-} !(IORef (Maybe a))
 
 -- | Specialized implementation of 'Reflex.Class.slowHeadE'.
-headE :: forall x m a. (HasSpiderTimeline x, Defer (SomeMergeInit x) m) => Event x a -> m (Event x a)
+headE :: forall (x :: Type) m a. (HasSpiderTimeline x, Defer (SomeMergeInit x) m) => Event x a -> m (Event x a)
 headE originalE = do
   stateRef <- liftIO $ newIORef (HeadEStateInitial originalE :: HeadEState x a)
   let unsubscribeAfterOccurrence occRef = liftIO (readIORef stateRef) >>= \case
@@ -1474,7 +1474,7 @@ debugSubscriber' description subscribed = Subscriber
 
 
 {-# INLINE withIncreasedDepth #-}
-withIncreasedDepth :: forall proxy x m a. CanTrace x m => proxy x -> m a -> m a
+withIncreasedDepth :: forall (x :: Type) m a. CanTrace x m => Proxy x -> m a -> m a
 withIncreasedDepth _ a = do
   liftIO $ modifyIORef' (_spiderTimeline_depth $ unSTE (spiderTimeline :: SpiderTimelineEnv x)) succ
   result <- a
