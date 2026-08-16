@@ -120,6 +120,7 @@ testRunWithReplace pulse = mdo
   let
     initialCards = [0..600]
     initialCardsV = V.fromList initialCards
+    initialCardsM = M.fromList [(k, k) | k <- initialCards]
 
   performEvent_ $ ffor pulse $ \p -> liftIO . putStrLn $ "pulse " <> show p
 
@@ -128,6 +129,12 @@ testRunWithReplace pulse = mdo
 
   let
     cCard index = do
+      listHoldWithKey (M.singleton 0 0) never $ \_ _ -> cCell index
+
+    cCell index = do
+      snd <$> runWithReplace (cDebugBox index) never
+
+    cDebugBox index = do
       let eDebugHoverBoxAlpha = select esDebugHoverBoxAlpha (Const2 index)
       performEvent_ $ ffor eDebugHoverBoxAlpha $ const . liftIO $ putStrLn "selectDebugHoverBoxAlpha"
 
@@ -149,7 +156,8 @@ testRunWithReplace pulse = mdo
 
   (_, eCommands) <- runEventWriterT $ do
     cMouseEvents
-    forM_ initialCards cCard
+    -- forM_ initialCards cCard
+    listHoldWithKey initialCardsM never $ \i _ -> cCard i
   let
     esCommand = fanG $ unDMMap <$> eCommands
     eMouseMove = head . NE.toList <$> selectG esCommand MouseMove
