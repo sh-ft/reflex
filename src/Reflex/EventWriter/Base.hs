@@ -10,7 +10,6 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
-
 module Reflex.EventWriter.Base
   ( EventWriterT (..)
   , runEventWriterT
@@ -88,7 +87,8 @@ newtype EventWriterT t w m a = EventWriterT { unEventWriterT :: StateT (Deferred
 runEventWriterT :: forall t m w a. (Reflex t, Monad m, Semigroup w) => EventWriterT t w m a -> m (a, Event t w)
 runEventWriterT (EventWriterT a) = do
   (result, requests) <- runStateT a mempty
-  trace "runEventWriterT test" $ return (trace "runEvenwWriter result" result, mconcatCheap . reverse . trace "runEventWriter Deferred.toList" $ Deferred.toList requests)
+  let !requestsL = Deferred.toList requests
+  trace "runEventWriterT test" $ return (trace "runEventWriter result" result, mconcatCheap . reverse . trace ("runEventWriter Deferred.toList " <> show (length requestsL)) $ requestsL)
 
 instance (Reflex t, Monad m, Semigroup w) => EventWriter t w (EventWriterT t w m) where
   tellEvent w = EventWriterT $ modify (<> Deferred.singleton w)

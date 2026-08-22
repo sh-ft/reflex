@@ -136,7 +136,7 @@ instance (ReflexHost t, PrimMonad (HostFrame t)) => Adjustable t (PerformEventT 
     RequesterInternalT $ tellEvent $ fforMaybeCheap requests concatIntMapMaybe
     pure (results0, results')
   {-# INLINE traverseDMapWithKeyWithAdjust #-}
-  traverseDMapWithKeyWithAdjust (f :: forall a. k a -> v a -> PerformEventT t m (v' a)) (a0 :: DMap k v) a' = PerformEventT $ RequesterT $ do
+  traverseDMapWithKeyWithAdjust (f :: forall a. k a -> v a -> PerformEventT t m (v' a)) (a0 :: DMap k v) a' = PerformEventT $ RequesterT $ {-# SCC "traverseDMapWithKeyWithAdjust" #-} do
     env@(_, _ :: TagGen (PrimState (HostFrame t)) FakeRequesterStatePhantom) <- RequesterInternalT ask
     let runA :: forall a. k a -> v a -> HostFrame t (Compose ((,) (Event t (NonEmptyDeferred (RequestEnvelope FakeRequesterStatePhantom (HostFrame t))))) v' a)
         runA k v = fmap (Compose . swap) $ runEventWriterT $ runReaderT (unRequesterInternalT a) env
@@ -151,7 +151,7 @@ instance (ReflexHost t, PrimMonad (HostFrame t)) => Adjustable t (PerformEventT 
     RequesterInternalT $ tellEvent $ fforMaybeCheap requests concatMapMaybe
     pure (results0, results')
   {-# INLINE traverseDMapWithKeyWithAdjustWithMove #-}
-  traverseDMapWithKeyWithAdjustWithMove (f :: forall a. k a -> v a -> PerformEventT t m (v' a)) (a0 :: DMap k v) a' = PerformEventT $ RequesterT $ do
+  traverseDMapWithKeyWithAdjustWithMove (f :: forall a. k a -> v a -> PerformEventT t m (v' a)) (a0 :: DMap k v) a' = PerformEventT $ RequesterT $ {-# SCC "traverseDMapWithKeyWithAdjustWithMove" #-} do
     env@(_, _ :: TagGen (PrimState (HostFrame t)) FakeRequesterStatePhantom) <- RequesterInternalT ask
     let runA :: forall a. k a -> v a -> HostFrame t (Compose ((,) (Event t (NonEmptyDeferred (RequestEnvelope FakeRequesterStatePhantom (HostFrame t))))) v' a)
         runA k v = fmap (Compose . swap) $ runEventWriterT $ runReaderT (unRequesterInternalT a) env
@@ -262,6 +262,7 @@ hostPerformEventTAndRead builder initialHostFrame seed step0 = do
 hostPerformEventT :: forall t m a.
                      ( MonadReflexHost t m
                      , MonadRef m
+                     , MonadIO m
                      , Ref m ~ Ref IO
                      , PrimMonad (HostFrame t)
                      )
