@@ -117,7 +117,7 @@ instance (ReflexHost t, PrimMonad (HostFrame t)) => Adjustable t (PerformEventT 
     RequesterInternalT $ tellEvent $ fforMaybeCheap requests concatIntMapMaybe
     pure (results0, results')
   {-# INLINE traverseDMapWithKeyWithAdjust #-}
-  traverseDMapWithKeyWithAdjust (f :: forall a. k a -> v a -> PerformEventT t m (v' a)) (a0 :: DMap k v) a' = PerformEventT $ RequesterT $ do
+  traverseDMapWithKeyWithAdjust (f :: forall a. k a -> v a -> PerformEventT t m (v' a)) (a0 :: DMap k v) a' = PerformEventT $ RequesterT $ {-# SCC "traverseDMapWithKeyWithAdjust" #-} do
     env@(_, _ :: TagGen (PrimState (HostFrame t)) FakeRequesterStatePhantom) <- RequesterInternalT ask
     let runA :: forall a. k a -> v a -> HostFrame t (Compose ((,) (Event t (NonEmptyDeferred (RequestEnvelope FakeRequesterStatePhantom (HostFrame t))))) v' a)
         runA k v = fmap (Compose . swap) $ runEventWriterT $ runReaderT (unRequesterInternalT a) env
@@ -132,7 +132,7 @@ instance (ReflexHost t, PrimMonad (HostFrame t)) => Adjustable t (PerformEventT 
     RequesterInternalT $ tellEvent $ fforMaybeCheap requests concatMapMaybe
     pure (results0, results')
   {-# INLINE traverseDMapWithKeyWithAdjustWithMove #-}
-  traverseDMapWithKeyWithAdjustWithMove (f :: forall a. k a -> v a -> PerformEventT t m (v' a)) (a0 :: DMap k v) a' = PerformEventT $ RequesterT $ do
+  traverseDMapWithKeyWithAdjustWithMove (f :: forall a. k a -> v a -> PerformEventT t m (v' a)) (a0 :: DMap k v) a' = PerformEventT $ RequesterT $ {-# SCC "traverseDMapWithKeyWithAdjustWithMove" #-} do
     env@(_, _ :: TagGen (PrimState (HostFrame t)) FakeRequesterStatePhantom) <- RequesterInternalT ask
     let runA :: forall a. k a -> v a -> HostFrame t (Compose ((,) (Event t (NonEmptyDeferred (RequestEnvelope FakeRequesterStatePhantom (HostFrame t))))) v' a)
         runA k v = fmap (Compose . swap) $ runEventWriterT $ runReaderT (unRequesterInternalT a) env
@@ -170,6 +170,7 @@ instance ReflexHost t => MonadReflexCreateTrigger t (PerformEventT t m) where
 hostPerformEventT :: forall t m a.
                      ( MonadReflexHost t m
                      , MonadRef m
+                     , MonadIO m
                      , Ref m ~ Ref IO
                      , PrimMonad (HostFrame t)
                      )
@@ -182,6 +183,7 @@ hostPerformEventT a = do
   return $ (,) result $ FireCommand $ \triggers (readPhase :: ReadPhase m a') -> do
     let go :: [DSum (EventTrigger t) Identity] -> m [a']
         go ts = do
+          liftIO $ putStrLn "hostPerformEventT: fireEventsAndRead"
           (result', mToPerform) <- fireEventsAndRead ts $ do
             mToPerform <- sequence =<< readEvent eventToPerformHandle
             result' <- readPhase
@@ -189,6 +191,7 @@ hostPerformEventT a = do
           case mToPerform of
             Nothing -> return [result']
             Just toPerform -> do
+              liftIO $ putStrLn "hostPerformEventT: Performing events"
               responses <- runHostFrame $ traverseRequesterData (fmap Identity) toPerform
               mrt <- readRef responseTrigger
               let followupEventTriggers = case mrt of

@@ -2384,18 +2384,22 @@ clearEventEnv (EventEnv toAssignRef holdInitRef dynInitRef mergeUpdateRef mergeI
 -- | Run an event action outside of a frame
 runFrame :: forall x a. HasSpiderTimeline x => EventM x a -> SpiderHost x a --TODO: This function also needs to hold the mutex
 runFrame a = SpiderHost $ do
+  tracePropagate (Proxy::Proxy x) $ "runFrame"
   let env = _spiderTimeline_eventEnv $ unSTE (spiderTimeline :: SpiderTimelineEnv x)
   let go = do
         result <- a
+        tracePropagate (Proxy::Proxy x) $ "runHoldInits"
         runHoldInits (eventEnvHoldInits env) (eventEnvDynInits env) (eventEnvMergeInits env) -- This must happen before doing the assignments, in case subscribing a Hold causes existing Holds to be read by the newly-propagated events
         return result
   result <- runEventM go
+  tracePropagate (Proxy::Proxy x) $ "Clearing"
   toClear <- readIORef $ eventEnvClears env
   forM_ toClear $ \(Some (Clear ref)) -> {-# SCC "clear" #-} writeIORef ref Nothing
   toClearInt <- readIORef $ eventEnvIntClears env
   forM_ toClearInt $ \(Some (IntClear ref)) -> {-# SCC "intClear" #-} writeIORef ref $! IntMap.empty
   toClearRoot <- readIORef $ eventEnvRootClears env
   forM_ toClearRoot $ \(Some (RootClear ref)) -> {-# SCC "rootClear" #-} writeIORef ref $! DMap.empty
+  tracePropagate (Proxy::Proxy x) $ "Doing assignments"
   toAssign <- readIORef $ eventEnvAssignments env
   toReconnectRef <- newIORef []
   coincidenceInfos <- readIORef $ eventEnvResetCoincidences env
@@ -2410,6 +2414,7 @@ runFrame a = SpiderHost $ do
   tracePropagate (Proxy::Proxy x) $ "Updating merges done"
   toReconnect <- readIORef toReconnectRef
   clearEventEnv env
+  tracePropagate (Proxy::Proxy x) $ "Killing switch subscriptions"
   switchSubscriptionsToKill <- forM toReconnect $ \(SomeSwitchSubscribed subscribed) -> {-# SCC "switchSubscribed" #-} do
     oldSubscription <- readIORef $ switchSubscribedCurrentParent subscribed
     wi <- readIORef $ switchSubscribedOwnWeakInvalidator subscribed
@@ -2436,6 +2441,7 @@ runFrame a = SpiderHost $ do
     return oldSubscription
   liftIO $ mapM_ unsubscribe mergeSubscriptionsToKill
   liftIO $ mapM_ unsubscribe switchSubscriptionsToKill
+  tracePropagate (Proxy::Proxy x) $ "Reconnecting switches"
   forM_ toReconnect $ \(SomeSwitchSubscribed subscribed) -> {-# SCC "switchSubscribed" #-} do
     EventSubscription _ subd' <- readIORef $ switchSubscribedCurrentParent subscribed
     parentHeight <- getEventSubscribedHeight subd'
@@ -2444,16 +2450,20 @@ runFrame a = SpiderHost $ do
       writeIORef (switchSubscribedHeight subscribed) $! invalidHeight
       WeakBag.traverse_ (switchSubscribedSubscribers subscribed) $ invalidateSubscriberHeight myHeight
   mapM_ _someMergeUpdate_invalidateHeight mergeUpdates --TODO: In addition to when the patch is completely empty, we should also not run this if it has some Nothing values, but none of them have actually had any effect; potentially, we could even check for Just values with no effect (e.g. by comparing their IORefs and ignoring them if they are unchanged); actually, we could just check if the new height is different
+  tracePropagate (Proxy::Proxy x) $ "Processing coincidences"
   forM_ coincidenceInfos $ \(SomeResetCoincidence subscription mInvalidate) -> do
     unsubscribe subscription
     mapM_ invalidateCoincidenceHeight mInvalidate
   invalidatedCoincidences <- readIORef $ eventEnvInvalidatedCoincidences env
   writeIORef (eventEnvInvalidatedCoincidences env) []
   forM_ invalidatedCoincidences $ \(SomeCoincidenceSubscribed subscribed) -> recalculateCoincidenceHeight subscribed
+  tracePropagate (Proxy::Proxy x) $ "Recalculating height of mergeUpdates"
   mapM_ _someMergeUpdate_recalculateHeight mergeUpdates
+  tracePropagate (Proxy::Proxy x) $ "Updating switch heights"
   forM_ toReconnect $ \(SomeSwitchSubscribed subscribed) -> do
     height <- calculateSwitchHeight subscribed
     updateSwitchHeight height subscribed
+  tracePropagate (Proxy::Proxy x) $ "runFrame done"
   return result
 
 newtype Height = Height { unHeight :: Int } deriving (Show, Read, Eq, Ord, Bounded)
