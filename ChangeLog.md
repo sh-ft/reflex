@@ -1,5 +1,25 @@
 # Revision history for reflex
 
+## 0.10.0.0
+
+* Breaking Change: `runQueryT`, `withQueryT`, and `dynWithQueryT` now require the `MonadHold t m` constraint instead of `MonadFix m`. This is due to [#530](https://github.com/reflex-frp/reflex/pull/530) by @parenthetical fixing an implementation detail in `runQueryT`.
+* Bug fix for `CausalityLoopException`s caused by incorrect coincidence and merge height invalidation by @parenthetical in [#536](https://github.com/reflex-frp/reflex/pull/536).
+* Space leak fixed: Applicative combination of Behaviors, with at least one never changing, no longer causes unbounded memory growth by @parenthetical in [#535](https://github.com/reflex-frp/reflex/pull/535).
+* Stray debug print removed from non-debug builds.
+
+## 0.9.4.0
+
+* Add note about `requesting` semantics by @LightAndLight in https://github.com/reflex-frp/reflex/pull/508
+* Dropped lens by @ilyakooo0 in https://github.com/reflex-frp/reflex/pull/463
+* Build with ghc(js) 9.8.2 + 9.10.1 + 9.12.2 by @ymeister in https://github.com/reflex-frp/reflex/pull/502
+* headless: Add MonadThrow (Performable m) by @ali-abrar in https://github.com/reflex-frp/reflex/pull/523
+* Don't check in newSubscriberCoincidenceInner whether occRef is already set by @parenthetical in https://github.com/reflex-frp/reflex/pull/496
+* Always enable Template Haskell by @Ericson2314 in https://github.com/reflex-frp/reflex/pull/484
+
+## 0.9.3.4
+
+* Support random 1.3
+
 ## 0.9.3.3
 
 * Add support for GHC 9.12

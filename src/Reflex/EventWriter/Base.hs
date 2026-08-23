@@ -10,9 +10,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
-#ifdef USE_REFLEX_OPTIMIZER
-{-# OPTIONS_GHC -fplugin=Reflex.Optimizer #-}
-#endif
+
 module Reflex.EventWriter.Base
   ( EventWriterT (..)
   , runEventWriterT
@@ -37,7 +35,6 @@ import Reflex.TriggerEvent.Class
 import Control.Monad.Catch (MonadMask, MonadThrow, MonadCatch)
 import Control.Monad.Exception
 import Control.Monad.Fix
-import Control.Monad.Identity
 import Control.Monad.Morph
 import Control.Monad.Primitive
 import Control.Monad.Reader
@@ -45,10 +42,9 @@ import Control.Monad.Ref
 import Control.Monad.State.Strict
 import Data.Dependent.Map (DMap)
 import qualified Data.Dependent.Map as DMap
-import Data.Dependent.Sum (DSum (..))
 import Data.Functor.Compose
 import Data.Functor.Misc
-import Data.GADT.Compare (GCompare (..))
+import Data.GADT.Compare (GCompare)
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.List.NonEmpty (NonEmpty (..))
@@ -76,6 +72,15 @@ newtype EventWriterT t w m a = EventWriterT { unEventWriterT :: StateT (Deferred
     , MonadCatch
     , MonadThrow
     )
+
+-- TODO: When 'Data.IntMap.fromDistinctDescList' becomes available
+-- (https://github.com/haskell/containers/pull/1194), key the reversed list with
+-- descending keys instead, so that 'combineResults' can use 'IntMap.elems'
+-- directly.
+
+-- TODO: If the 'Semigroup' were known to be commutative, the intermediate
+-- 'IntMap's could be avoided. (See
+-- https://github.com/reflex-frp/reflex/issues/538)
 
 -- | Run a 'EventWriterT' action.
 runEventWriterT :: forall t m w a. (Reflex t, Monad m, Semigroup w) => EventWriterT t w m a -> m (a, Event t w)

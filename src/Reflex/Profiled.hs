@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE EmptyDataDecls #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -11,6 +12,7 @@
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE RankNTypes #-}
+
 -- |
 -- Module:
 --   Reflex.Profiled
@@ -44,6 +46,12 @@ import Foreign.Ptr
 import GHC.Foreign
 import GHC.IO.Encoding
 import GHC.Stack
+import System.IO.Unsafe
+
+#if !MIN_VERSION_base(4,18,0)
+import Data.Monoid ((<>))
+#endif
+
 import Reflex.Adjustable.Class
 import Reflex.BehaviorWriter.Class
 import Reflex.Class
@@ -56,8 +64,6 @@ import Reflex.PostBuild.Class
 import Reflex.Query.Class
 import Reflex.Requester.Class
 import Reflex.TriggerEvent.Class
-
-import System.IO.Unsafe
 
 data ProfiledTimeline t
 
@@ -274,8 +280,7 @@ instance PrimMonad m => PrimMonad (ProfiledM m) where
 
 instance MonadReflexHost t m => MonadReflexHost (ProfiledTimeline t) (ProfiledM m) where
   type ReadPhase (ProfiledM m) = ProfiledM (ReadPhase m)
-  fireEventsAndRead ts r = lift $ fireEventsAndRead ts $ coerce r
-  runHostFrame = lift . runHostFrame . coerce
+  hostFrameAndRead build getTriggers readPhase = lift $ hostFrameAndRead (coerce build) (runProfiledM . getTriggers) (runProfiledM . readPhase)
 
 instance MonadReadEvent t m => MonadReadEvent (ProfiledTimeline t) (ProfiledM m) where
   readEvent = lift . fmap coerce . readEvent

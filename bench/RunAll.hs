@@ -63,12 +63,6 @@ import qualified Data.Map as Map
 type MonadReflexHost' t m = (MonadReflexHost t m, MonadIORef m, MonadIORef (HostFrame t))
 
 
-setupFiring ::   (MonadReflexHost t m, MonadIORef m) => Plan t (Event t a) -> m (EventHandle t a, Schedule t)
-setupFiring p = do
-  (e, s) <- runPlan p
-  h <- subscribeEvent e
-  return (h, s)
-
 -- Hack to avoid the NFData constraint for EventHandle which is a synonym
 newtype Ignore a = Ignore a
 instance NFData (Ignore a) where
@@ -84,17 +78,17 @@ instance NFData (Firing t) where
   rnf !_ = ()
 
 -- Measure the running time
-benchFiring :: forall t m. (MonadReflexHost' t m, MonadSample t m) => (forall a. m a -> IO a) -> TestCase -> Int -> IO ()
+benchFiring :: forall t m. (MonadReflexHost' t m) => (forall a. m a -> IO a) -> TestCase -> Int -> IO ()
 benchFiring runHost tc n = runHost $ do
   let runIterations :: m a -> m ()
       runIterations test = replicateM_ (10*n) $ do
         result <- test
         liftIO $ evaluate result
   case tc of
-    TestE p -> do
+    TestE _ p -> do
       (h, s) <- setupFiring p
       runIterations $ readSchedule_ s $ readEvent' h
-    TestB p -> do
+    TestB _ p -> do
       (b, s) <- runPlan p
       runIterations $ readSchedule_ (makeDense s) $ sample b
 
@@ -114,15 +108,19 @@ waitForFinalizers = do
 benchmarks :: [(String, Int -> IO ())]
 benchmarks = implGroup "spider" runSpiderHost cases
   where
-    implGroup :: (MonadReflexHost' t m, MonadSample t m) => String -> (forall a. m a -> IO a) -> [(String, TestCase)] -> [(String, Int -> IO ())]
+    implGroup :: (MonadReflexHost' t m) => String -> (forall a. m a -> IO a) -> [(String, TestCase)] -> [(String, Int -> IO ())]
     implGroup name runHost = group name . fmap (second (benchFiring runHost))
     group name = fmap $ first ((name <> "/") <>)
     sub n frames = group ("subscribing " ++ show (n, frames)) $ Focused.subscribing n frames
+    headEs n frames = group ("headE " ++ show (n, frames)) $ Focused.headEs n frames
     firing n     = group ("firing "    <> show n) $ Focused.firing n
     merging n    = group ("merging "   <> show n) $ Focused.merging n
     dynamics n   = group ("dynamics "  <> show n) $ Focused.dynamics n
+    shared w     = group ("sharedInvalidators " <> show w) $ Focused.sharedInvalidators w
+    eventWriter w = group ("eventWriter " <> show w) $ Focused.eventWriters w
     cases = concat
       [ sub 100 40
+      , headEs 100 40
       , dynamics 100
       , dynamics 1000
       , firing 1000
@@ -131,6 +129,12 @@ benchmarks = implGroup "spider" runSpiderHost cases
       , merging 50
       , merging 100
       , merging 200
+      , shared 30
+      , shared 100
+      , shared 300
+      , shared 1000
+      , eventWriter 100
+      , eventWriter 1000
       ]
 
 pattern RunTestCaseFlag = "--run-test-case"

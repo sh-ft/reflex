@@ -7,9 +7,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
-#ifdef USE_REFLEX_OPTIMIZER
-{-# OPTIONS_GHC -fplugin=Reflex.Optimizer #-}
-#endif
+
 -- |
 -- Module:
 --   Reflex.Collection
@@ -43,10 +41,13 @@ import qualified Data.Map as Map
 import Data.Map.Misc
 import Data.These
 
+#if !MIN_VERSION_base(4,18,0)
+import Control.Monad.Identity
+#endif
+
 import Reflex.Class
 import Reflex.Adjustable.Class
 import Reflex.Dynamic
-import Reflex.PostBuild.Class
 
 -- | Create a set of widgets based on the provided 'Map'. When the
 -- input 'Event' fires, remove widgets for keys with the value 'Nothing'
@@ -75,12 +76,12 @@ listHoldWithKey m0 m' f = do
 --where the Events carry diffs, not the whole value
 listWithKey
   :: forall t k v m a
-   . (Ord k, Adjustable t m, PostBuild t m, MonadFix m, MonadHold t m, Eq v)
+   . (Ord k, Adjustable t m, MonadFix m, MonadHold t m, Eq v)
   => Dynamic t (Map k v)
   -> (k -> Dynamic t v -> m a)
   -> m (Dynamic t (Map k a))
 listWithKey vals mkChild = do
-  postBuild <- getPostBuild
+  postBuild <- now
   let childValChangedSelector = fanMap $ updated vals
 
       -- We keep track of changes to children values in the mkChild
@@ -148,7 +149,7 @@ listWithKeyShallowDiff initialVals valsChanged mkChild = do
 --   this scenario, but 'listViewWithKey' flattens this to
 --   @/Event t (Map k a)/@ via 'switch'.
 listViewWithKey
-  :: (Ord k, Adjustable t m, PostBuild t m, MonadHold t m, MonadFix m, Eq v)
+  :: (Ord k, Adjustable t m, MonadHold t m, MonadFix m, Eq v)
   => Dynamic t (Map k v)
   -> (k -> Dynamic t v -> m (Event t a))
   -> m (Event t (Map k a))
@@ -156,7 +157,7 @@ listViewWithKey vals mkChild =
   switch . fmap mergeMap <$> listViewWithKey' vals mkChild
 
 listViewWithKey'
-  :: (Ord k, Adjustable t m, PostBuild t m, MonadHold t m, MonadFix m, Eq v)
+  :: (Ord k, Adjustable t m, MonadHold t m, MonadFix m, Eq v)
   => Dynamic t (Map k v)
   -> (k -> Dynamic t v -> m a)
   -> m (Behavior t (Map k a))
@@ -166,7 +167,7 @@ listViewWithKey' vals mkChild = current <$> listWithKey vals mkChild
 -- selected at any time.
 selectViewListWithKey
   :: forall t m k v a
-   . (Adjustable t m, Ord k, PostBuild t m, MonadHold t m, MonadFix m, Eq v)
+   . (Adjustable t m, Ord k, MonadHold t m, MonadFix m, Eq v)
   => Dynamic t k
   -- ^ Current selection key
   -> Dynamic t (Map k v)
@@ -190,7 +191,7 @@ selectViewListWithKey selection vals mkChild = do
 -- item widget's output 'Event'.
 selectViewListWithKey_
   :: forall t m k v a
-   . (Adjustable t m, Ord k, PostBuild t m, MonadHold t m, MonadFix m, Eq v)
+   . (Adjustable t m, Ord k, MonadHold t m, MonadFix m, Eq v)
   => Dynamic t k
   -- ^ Current selection key
   -> Dynamic t (Map k v)
@@ -208,7 +209,7 @@ selectViewListWithKey_ selection vals mkChild =
 --   key/value map.  Unlike the 'withKey' variants, the child widgets
 --   are insensitive to which key they're associated with.
 list
-  :: (Ord k, Adjustable t m, MonadHold t m, PostBuild t m, MonadFix m, Eq v)
+  :: (Ord k, Adjustable t m, MonadHold t m, MonadFix m, Eq v)
   => Dynamic t (Map k v)
   -> (Dynamic t v -> m a)
   -> m (Dynamic t (Map k a))
@@ -216,7 +217,7 @@ list dm mkChild = listWithKey dm (\_ dv -> mkChild dv)
 
 -- | Create a dynamically-changing set of widgets from a Dynamic list.
 simpleList
-  :: (Adjustable t m, MonadHold t m, PostBuild t m, MonadFix m, Eq v)
+  :: (Adjustable t m, MonadHold t m, MonadFix m, Eq v)
   => Dynamic t [v]
   -> (Dynamic t v -> m a)
   -> m (Dynamic t [a])

@@ -8,15 +8,11 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE PolyKinds #-}
-
-#ifdef USE_REFLEX_OPTIMIZER
-{-# OPTIONS_GHC -fplugin=Reflex.Optimizer #-}
-#endif
-
 -- There are two expected orphan instances in this module:
 --   * MonadSample (Pure t) ((->) t)
 --   * MonadHold (Pure t) ((->) t)
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+
 -- |
 -- Module: Reflex.Pure
 -- Description:
@@ -170,7 +166,7 @@ instance Monad (Dynamic (Pure t)) where
           Nothing -> (Nothing, Nothing)
           Just nextX -> let (c, u) = unDynamic (f nextX) t
                         in (Just c, u)
-    in (cur, getFirst $ mconcat $ map First [updBoth, updOuter, updInner])
+    in (cur, getFirst $ mconcat $ map First [updBoth, updInner, updOuter])
 
 instance MonadSample (Pure t) ((->) t) where
 

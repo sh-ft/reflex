@@ -1,5 +1,6 @@
 {-# LANGUAGE RecursiveDo #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+
 -- |
 -- Module:
 --   Reflex.Workflow
@@ -7,8 +8,8 @@
 --   Provides a convenient way to describe a series of interrelated widgets that
 --   can send data to, invoke, and replace one another. Useful for modeling user interface
 --   "workflows."
-module Reflex.Workflow (
-    Workflow (..)
+module Reflex.Workflow
+  ( Workflow (..)
   , workflow
   , workflowView
   , mapWorkflow
@@ -22,7 +23,6 @@ import Reflex.Class
 import Reflex.Adjustable.Class
 import Reflex.Network
 import Reflex.NotReady.Class
-import Reflex.PostBuild.Class
 
 -- | A widget in a workflow
 --
@@ -36,7 +36,7 @@ workflow w0 = do
   return $ fmap fst eResult
 
 -- | Similar to 'workflow', but outputs an 'Event' that fires at post-build time and whenever the current 'Workflow' is replaced by the next 'Workflow'.
-workflowView :: forall t m a. (NotReady t m, Adjustable t m, MonadFix m, MonadHold t m, PostBuild t m) => Workflow t m a -> m (Event t a)
+workflowView :: forall t m a. (NotReady t m, Adjustable t m, MonadFix m, MonadHold t m) => Workflow t m a -> m (Event t a)
 workflowView w0 = do
   rec eResult <- networkView . fmap unWorkflow =<< holdDyn w0 eReplace
       eReplace <- fmap switch $ hold never $ fmap snd eResult

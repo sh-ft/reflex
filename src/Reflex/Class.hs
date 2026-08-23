@@ -17,9 +17,6 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE Trustworthy #-}
-#ifdef USE_REFLEX_OPTIMIZER
-{-# OPTIONS_GHC -fplugin=Reflex.Optimizer #-}
-#endif
 
 -- |
 -- Module:
@@ -192,6 +189,7 @@ import Control.Monad.Fix
 import Control.Monad.Identity
 import Control.Monad.Reader
 import Control.Monad.State.Strict
+import qualified Control.Monad.State.Lazy as Lazy
 import Control.Monad.Trans.Cont (ContT)
 import Control.Monad.Trans.Except (ExceptT)
 import Control.Monad.Trans.RWS (RWST)
@@ -635,6 +633,17 @@ instance MonadHold t m => MonadHold t (ContT r m) where
   headE = lift . headE
   now = lift now
 
+instance MonadSample t m => MonadSample t (Lazy.StateT s m) where
+  sample = lift . sample
+
+instance MonadHold t m => MonadHold t (Lazy.StateT r m) where
+  hold a0 = lift . hold a0
+  holdDyn a0 = lift . holdDyn a0
+  holdIncremental a0 = lift . holdIncremental a0
+  buildDynamic a0 = lift . buildDynamic a0
+  headE = lift . headE
+  now = lift now
+
 --------------------------------------------------------------------------------
 -- Convenience functions
 --------------------------------------------------------------------------------
@@ -965,15 +974,21 @@ unsafeMapIncremental f g a = unsafeBuildIncremental (fmap f $ sample $ currentIn
 mergeMap :: (Reflex t, Ord k) => Map k (Event t a) -> Event t (Map k a)
 mergeMap = fmap dmapToMap . merge . mapWithFunctorToDMap
 
--- | Create a merge whose parents can change over time
+-- | Alias for 'mergeInt'.
+{-# DEPRECATED mergeIntMap "Use 'mergeInt' instead" #-}
+mergeIntMap :: Reflex t => IntMap (Event t a) -> Event t (IntMap a)
+mergeIntMap = mergeInt
+
+-- | Create a merge whose parents can change over time.
 mergeMapIncremental :: (Reflex t, Ord k) => Incremental t (PatchMap k (Event t a)) -> Event t (Map k a)
 mergeMapIncremental = fmap dmapToMap . mergeIncremental . unsafeMapIncremental mapWithFunctorToDMap (const2PatchDMapWith id)
 
--- | Create a merge whose parents can change over time
+-- | Alias for 'mergeIntIncremental'.
+{-# DEPRECATED mergeIntMapIncremental "Use 'mergeIntIncremental' instead" #-}
 mergeIntMapIncremental :: Reflex t => Incremental t (PatchIntMap (Event t a)) -> Event t (IntMap a)
-mergeIntMapIncremental = fmap dmapToIntMap . mergeIncremental . unsafeMapIncremental intMapWithFunctorToDMap (const2IntPatchDMapWith id)
+mergeIntMapIncremental = mergeIntIncremental
 
--- | Experimental: Create a merge whose parents can change over time; changing the key of an Event is more efficient than with mergeIncremental
+-- | Experimental: Create a merge whose parents can change over time; changing the key of an Event is more efficient than with mergeIncremental.
 mergeMapIncrementalWithMove :: (Reflex t, Ord k) => Incremental t (PatchMapWithMove k (Event t a)) -> Event t (Map k a)
 mergeMapIncrementalWithMove = fmap dmapToMap . mergeIncrementalWithMove . unsafeMapIncremental mapWithFunctorToDMap (const2PatchDMapWithMoveWith id)
 
