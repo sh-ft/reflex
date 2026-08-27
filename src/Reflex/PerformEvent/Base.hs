@@ -40,6 +40,7 @@ import Control.Monad.Fix
 import Control.Monad.Primitive
 import Control.Monad.Reader
 import Control.Monad.Ref
+import Data.Traversable.WithIndex (itraverse)
 import Data.Dependent.Map (DMap)
 import qualified Data.Dependent.Map as DMap
 import Data.Dependent.Sum
@@ -200,6 +201,7 @@ hostPerformEventTAndRead :: forall t m a b acc0 stop0.
                      ( MonadReflexHost t m
                      , MonadRef m
                      , Ref m ~ Ref IO
+                     , PrimMonad (HostFrame t)
                      )
                   => PerformEventT t m a
                   -> (a -> HostFrame t b)
@@ -212,20 +214,20 @@ hostPerformEventTAndRead :: forall t m a b acc0 stop0.
 hostPerformEventTAndRead builder initialHostFrame seed step0 = do
   (response, responseTrigger) <- newEventWithTriggerRef
   let
-    readStep :: forall stop' acc'
-             .  EventHandle t (RequesterData (HostFrame t))
+    readStep :: forall stop' acc' request
+             .  EventHandle t (RequestData (PrimState (HostFrame t)) request)
              -> (acc' -> ReadPhase m (Either stop' acc'))
              -> acc'
-             -> ReadPhase m (Either stop' acc', Maybe (RequesterData (HostFrame t)))
+             -> ReadPhase m (Either stop' acc', Maybe (RequestData (PrimState (HostFrame t)) request))
     readStep perfHandle step acc = do
       ds <- step acc
       more <- sequence =<< readEvent perfHandle
       pure (ds, more)
     -- Fold the step across the cascade until it aborts or the cascade quiesces.
     drain :: forall stop' acc'
-          .  EventHandle t (RequesterData (HostFrame t))
+          .  EventHandle t (RequestData (PrimState (HostFrame t)) (HostFrame t))
           -> (acc' -> ReadPhase m (Either stop' acc'))
-          -> (Either stop' acc', Maybe (RequesterData (HostFrame t)))
+          -> (Either stop' acc', Maybe (RequestData (PrimState (HostFrame t)) (HostFrame t)))
           -> m (Either stop' acc')
     drain _ _ (Left stop, _) = pure $ Left stop
     drain _ _ (Right acc, Nothing) = pure $ Right acc
@@ -238,7 +240,7 @@ hostPerformEventTAndRead builder initialHostFrame seed step0 = do
           (const (readStep perfHandle step acc))
   (a, b, perfHandle, frame0) <- hostFrameAndRead
     (do (result, eventToPerform) <- runRequesterT (unPerformEventT builder) response
-        perfHandle' :: EventHandle t (RequesterData (HostFrame t)) <- subscribeEvent eventToPerform
+        perfHandle' :: EventHandle t (RequestData (PrimState (HostFrame t)) request) <- subscribeEvent eventToPerform
         b' <- initialHostFrame result
         pure (result, b', perfHandle'))
     (const (pure []))

@@ -169,6 +169,7 @@ library
       , haskell-src-exts >= 1.16 && < 1.24
       , haskell-src-meta >= 0.6 && < 0.9
       , template-haskell >= 2.9 && < 2.24
+      , indexed-traversable >= 0.1 && < 0.2
 
     other-extensions:
       TemplateHaskell
@@ -372,6 +373,25 @@ test-suite Adjustable
       , reflex
       , ref-tf
       , these
+
+test-suite PerformEventPerf2
+  default-language: Haskell2010
+  type: exitcode-stdio-1.0
+  main-is: PerformEventPerf2.hs
+  hs-source-dirs: test
+  build-depends: base
+               , containers
+               , dependent-sum
+               , reflex
+               , ref-tf
+               , these
+               , patch
+               , time
+               , vector
+               , dependent-map
+
+  other-modules:
+    Test.Run
 
 test-suite QueryT
     type:             exitcode-stdio-1.0
