@@ -110,15 +110,15 @@ instance (ReflexHost t, Ref m ~ Ref IO, Monad (HostFrame t), PrimMonad (HostFram
 
 instance (ReflexHost t, PrimMonad (HostFrame t)) => Adjustable t (PerformEventT t m) where
   {-# INLINE runWithReplace #-}
-  runWithReplace a0 a' = PerformEventT $ RequesterT $ do
+  runWithReplace a0 a' = PerformEventT $ RequesterT $ {-# SCC "runWithReplace" #-} do
     env@(_, _ :: TagGen (PrimState (HostFrame t)) FakeRequesterStatePhantom) <- RequesterInternalT ask
     let runA :: forall a. PerformEventT t m a -> HostFrame t (a, Event t (NonEmptyDeferred (RequestEnvelope FakeRequesterStatePhantom (HostFrame t))))
-        runA (PerformEventT (RequesterT a)) = runEventWriterT $ runReaderT (unRequesterInternalT a) env
+        runA (PerformEventT (RequesterT a)) = {-# SCC "runWithReplace_runA" #-}runEventWriterT $ runReaderT (unRequesterInternalT a) env
     (result0, requests0) <- lift $ runA a0
-    newA <- requestingIdentity $ runA <$> a'
+    newA <- {-# SCC "runWithReplace_requestingIdentity" #-}requestingIdentity $ runA <$> a'
     -- switchHold is fast, switchHoldPromptly and switchHoldPromptOnly are not
-    -- requests <- switchHoldPromptOnly requests0 $ fmapCheap snd newA
-    requests <- switchHold requests0 $ fmapCheap snd newA
+    -- requests <- {-# SCC "runWithReplace_switchHoldPromptOnly" #-}switchHoldPromptOnly requests0 $ fmapCheap snd newA
+    requests <- {-# SCC "runWithReplace_switchHold" #-} switchHold requests0 $ fmapCheap snd newA
     RequesterInternalT $ tellEvent requests
     pure (result0, fmapCheap fst newA)
   {-# INLINE traverseIntMapWithKeyWithAdjust #-}
@@ -262,7 +262,6 @@ hostPerformEventTAndRead builder initialHostFrame seed step0 = do
 hostPerformEventT :: forall t m a.
                      ( MonadReflexHost t m
                      , MonadRef m
-                     , MonadIO m
                      , Ref m ~ Ref IO
                      , PrimMonad (HostFrame t)
                      )
