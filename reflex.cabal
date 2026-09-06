@@ -7,7 +7,7 @@ maintainer:         ryan.trinkle@gmail.com
 author:             Ryan Trinkle
 stability:          Experimental
 tested-with:
-    ghc ==8.4.4 || ==8.6.5 || ==8.8.1 || ==8.10.7 || ==9.0.1 || ==9.2.5 || ==9.4.5 || ==9.6.1 || ==9.8.2 || ==9.10.1 || ==9.12.2
+    ghc ==8.4.4 || ==8.6.5 || ==8.8.1 || ==8.10.7 || ==9.0.1 || ==9.2.5 || ==9.4.5 || ==9.6.1 || ==9.8.2 || ==9.10.1 || ==9.12.2 || ==9.14.1
 
 homepage:           https://reflex-frp.org
 bug-reports:        https://github.com/reflex-frp/reflex/issues
@@ -56,6 +56,11 @@ flag debug-propagation
 
 flag debug-cycles
     description: Enable debugging of event cycles
+    default:     False
+    manual:      True
+
+flag debug-frame
+    description: Check frame hygiene
     default:     False
     manual:      True
 
@@ -112,6 +117,7 @@ library
         Reflex.Requester.Base.Internal
         Reflex.Requester.Class
         Reflex.Spider
+        Reflex.Spider.Height
         Reflex.Spider.Internal
         Reflex.Time
         Reflex.TriggerEvent.Base
@@ -137,13 +143,13 @@ library
 
     build-depends:
         MemoTrie == 0.6.*
-      , base >= 4.11 && < 4.22
+      , base >= 4.11 && < 4.23
       , bifunctors >= 5.2 && < 5.7
       , comonad >= 5.0.4 && < 5.1
       , commutative-semigroups >= 0.1 && <0.3
       , constraints >= 0.10 && <0.15
       , constraints-extras >= 0.3 && < 0.5
-      , containers >= 0.6 && < 0.8
+      , containers >= 0.6 && < 0.9
       , data-default >= 0.5 && < 0.9
       , dependent-map >= 0.3 && < 0.5
       , dependent-sum >= 0.6 && < 0.8
@@ -162,13 +168,13 @@ library
       , semigroupoids >= 4.0 && < 7
       , stm >= 2.4 && < 2.6
       , syb >= 0.5 && < 0.8
-      , time >= 1.4 && < 1.15
+      , time >= 1.4 && < 1.16
       , transformers >= 0.5 && < 0.7
       , unbounded-delays >= 0.1.0.0 && < 0.2
       , witherable >= 0.4 && < 0.6
       , haskell-src-exts >= 1.16 && < 1.24
       , haskell-src-meta >= 0.6 && < 0.9
-      , template-haskell >= 2.9 && < 2.24
+      , template-haskell >= 2.9 && < 2.25
       , indexed-traversable >= 0.1 && < 0.2
 
     other-extensions:
@@ -187,7 +193,7 @@ library
 
     if flag(debug-trace-events)
         cpp-options:   -DDEBUG_TRACE_EVENTS
-        build-depends: bytestring >=0.10.8 && <0.11
+        build-depends: bytestring >=0.10.8 && <0.13
 
     if flag(debug-propagation)
         cpp-options:
@@ -195,6 +201,9 @@ library
 
     if flag(debug-cycles)
         cpp-options: -DDEBUG_CYCLES
+
+    if flag(debug-frame)
+        cpp-options: -DDEBUG_FRAME
 
     if flag(fast-weak) && impl(ghcjs >=0)
         cpp-options: -DGHCJS_FAST_WEAK
@@ -217,7 +226,7 @@ test-suite semantics
     default-language: Haskell2010
     ghc-options:      -O2 -Wall -rtsopts
     build-depends:
-        base >= 4.11 && < 4.22
+        base >= 4.11 && < 4.23
       , bifunctors
       , containers
       , deepseq
@@ -240,7 +249,7 @@ test-suite CrossImpl
     default-language: Haskell2010
     ghc-options:      -O2 -Wall -rtsopts
     build-depends:
-        base >= 4.11 && < 4.22
+        base >= 4.11 && < 4.23
       , containers
       , dependent-map
       , dependent-sum
@@ -256,7 +265,7 @@ test-suite hlint
     hs-source-dirs:   test
     default-language: Haskell2010
     build-depends:
-        base >= 4.11 && < 4.22
+        base >= 4.11 && < 4.23
       , directory
       , filepath
       , filemanip
@@ -280,7 +289,7 @@ test-suite EventWriterT
     other-modules:    Test.Run
     default-language: Haskell2010
     build-depends:
-        base >= 4.11 && < 4.22
+        base >= 4.11 && < 4.23
       , containers
       , deepseq
       , dependent-map
@@ -303,7 +312,7 @@ test-suite DebugCycles
     default-language: Haskell2010
     ghc-options:      -threaded
     build-depends:
-        base >= 4.11 && < 4.22
+        base >= 4.11 && < 4.23
       , containers
       , deepseq
       , dependent-map
@@ -333,7 +342,7 @@ test-suite RequesterT
 
     default-language: Haskell2010
     build-depends:
-        base >= 4.11 && < 4.22
+        base >= 4.11 && < 4.23
       , constraints
       , constraints-extras
       , containers
@@ -357,7 +366,7 @@ test-suite Headless
     hs-source-dirs:   test
     default-language: Haskell2010
     build-depends:
-        base >= 4.11 && < 4.22
+        base >= 4.11 && < 4.23
       , reflex
 
 test-suite Adjustable
@@ -367,7 +376,7 @@ test-suite Adjustable
     other-modules:    Test.Run
     default-language: Haskell2010
     build-depends:
-        base >= 4.11 && < 4.22
+        base >= 4.11 && < 4.23
       , containers
       , dependent-sum
       , reflex
@@ -405,7 +414,7 @@ test-suite QueryT
 
     default-language: Haskell2010
     build-depends:
-        base >= 4.11 && < 4.22
+        base >= 4.11 && < 4.23
       , commutative-semigroups
       , containers
       , dependent-map
@@ -437,7 +446,7 @@ test-suite GC-Semantics
 
     default-language: Haskell2010
     build-depends:
-        base >= 4.11 && < 4.22
+        base >= 4.11 && < 4.23
       , containers
       , dependent-sum
       , dependent-map
@@ -463,7 +472,7 @@ test-suite rootCleanup
 
     default-language: Haskell2010
     build-depends:
-        base >= 4.11 && < 4.22
+        base >= 4.11 && < 4.23
       , containers
       , deepseq
       , dependent-sum
@@ -479,7 +488,7 @@ test-suite runHostFrame
     default-language: Haskell2010
     ghc-options:      -Wall
     build-depends:
-        base >= 4.11 && < 4.22
+        base >= 4.11 && < 4.23
       , containers
       , reflex
       , tasty
@@ -493,7 +502,7 @@ test-suite behaviorLeak
     default-language: Haskell2010
     ghc-options:      -Wall -O2 -rtsopts "-with-rtsopts=-T"
     build-depends:
-        base >= 4.11 && < 4.22
+        base >= 4.11 && < 4.23
       , dependent-sum
       , reflex
       , ref-tf
@@ -511,7 +520,7 @@ benchmark spider-bench
     default-language: Haskell2010
     ghc-options:      -Wall -O2 -rtsopts
     build-depends:
-        base >= 4.11 && < 4.22
+        base >= 4.11 && < 4.23
       , containers
       , criterion
       , deepseq
@@ -541,7 +550,7 @@ benchmark saulzar-bench
     default-language: Haskell2010
     ghc-options:      -Wall -O2 -rtsopts -threaded
     build-depends:
-        base >= 4.11 && < 4.22
+        base >= 4.11 && < 4.23
       , containers
       , criterion
       , deepseq
