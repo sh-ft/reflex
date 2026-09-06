@@ -63,10 +63,10 @@ main = do
   start <- liftIO getCurrentTime
   b1s <- runAppB testRunWithReplace $ map Just (replicate 10000 $ Increment 'a')
   mapM_ print b1s
-  -- let !False = last (last b1s) == ["0a0","1b3","2c0","3d1","4e0"]
+  let !False = last (last b1s) == ["0a0","1b3","2c0","3d1","4e0"]
   end <- liftIO getCurrentTime
   liftIO $ putStrLn $ "total runtime: " <> show (diffUTCTime end start)
-  -- let !False = True
+  let !False = True
   return ()
 
 
@@ -134,15 +134,18 @@ testRunWithReplace pulse = mdo
     -- cCell index = do
     --   snd <$> runWithReplace (cDebugBox index) never
 
-    cDebugBox index = do
+    cDebugBox index = {-# SCC "cDebugBox" #-} do
       let eDebugHoverBoxAlpha = select esDebugHoverBoxAlpha (Const2 index)
       -- performEvent_ $ ffor eDebugHoverBoxAlpha $ const . liftIO $ putStrLn "selectDebugHoverBoxAlpha"
 
-      void $ runWithReplace (pure ()) $ ffor eDebugHoverBoxAlpha $ \_ -> do
+      void $ runWithReplace (pure ()) $ ffor eDebugHoverBoxAlpha $ \_ -> {-# SCC "cDebugBox_inner" #-} do
         start <- liftIO getCurrentTime
 
-        void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
-        void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
+        -- {-# SCC "cDebugBox_inner_runWithReplace" #-} do
+        --   {-# SCC "cDebugBox_inner_test" #-} do
+        --     liftIO $ putStrLn "test"
+        --   void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
+        --   void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
 
         end <- liftIO getCurrentTime
         liftIO $ putStrLn $ show (diffUTCTime end start)

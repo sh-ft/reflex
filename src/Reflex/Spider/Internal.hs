@@ -2462,7 +2462,7 @@ runFrame a = SpiderHost $ do
   tracePropagate (Proxy::Proxy x) $ "Updating merges done"
   toReconnect <- readIORef toReconnectRef
   clearEventEnv env
-  switchSubscriptionsToKill <- forM toReconnect $ \(SomeSwitchSubscribed subscribed) -> {-# SCC "switchSubscribed" #-} do
+  switchSubscriptionsToKill <- forM toReconnect $ \(SomeSwitchSubscribed subscribed) -> {-# SCC "switchSubscribed_1" #-} do
     oldSubscription <- readIORef $ switchSubscribedCurrentParent subscribed
     wi <- readIORef $ switchSubscribedOwnWeakInvalidator subscribed
     traceInvalidate $ "Finalizing invalidator for Switch" <> showNodeId subscribed
@@ -2488,7 +2488,7 @@ runFrame a = SpiderHost $ do
     return oldSubscription
   liftIO $ mapM_ unsubscribe mergeSubscriptionsToKill
   liftIO $ mapM_ unsubscribe switchSubscriptionsToKill
-  forM_ toReconnect $ \(SomeSwitchSubscribed subscribed) -> {-# SCC "switchSubscribed" #-} do
+  forM_ toReconnect $ \(SomeSwitchSubscribed subscribed) -> {-# SCC "switchSubscribed_2" #-} do
     EventSubscription _ subd' <- readIORef $ switchSubscribedCurrentParent subscribed
     parentHeight <- getEventSubscribedHeight subd'
     myHeight <- readIORef $ switchSubscribedHeight subscribed

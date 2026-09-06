@@ -27,10 +27,10 @@ main = do
   start <- liftIO getCurrentTime
   b1s <- runAppB app [Just (TestAction i) | i <- [1..1]]
   mapM_ print b1s
-  -- let !False = last b1s == ["0a0","1b3","2c0","3d1","4e0"]
+  let !False = last b1s == ["0a0","1b3","2c0","3d1","4e0"]
   end <- liftIO getCurrentTime
   liftIO $ putStrLn $ "total runtime: " <> show (diffUTCTime end start)
-  -- let !False = True
+  let !False = True
   return ()
 
 data Action
