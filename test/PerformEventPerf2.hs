@@ -43,6 +43,8 @@ import Reflex.Network
 import Reflex.Patch.MapWithMove
 import Test.Run
 
+import System.Mem
+
 
 -- Dependent multimap
 newtype DMMap k = DMMap { unDMMap :: DMap k NonEmpty }
@@ -61,8 +63,8 @@ singletonNE k = DMMap . DM.singleton k . (NE.:| [])
 main :: IO ()
 main = do
   start <- liftIO getCurrentTime
-  b1s <- runAppB testRunWithReplace $ map Just (replicate 10000 $ Increment 'a')
-  mapM_ print b1s
+  b1s <- runAppB testRunWithReplace $ map Just (replicate 500 $ Increment 'a')
+  -- mapM_ print b1s
   let !False = last (last b1s) == ["0a0","1b3","2c0","3d1","4e0"]
   end <- liftIO getCurrentTime
   liftIO $ putStrLn $ "total runtime: " <> show (diffUTCTime end start)
@@ -117,7 +119,7 @@ testRunWithReplace
   -> m (Behavior t [String])
 testRunWithReplace pulse = mdo
   let
-    initialCards = [0..600]
+    initialCards = [0..1]
     initialCardsV = V.fromList initialCards
     initialCardsM = M.fromList [(k, k) | k <- initialCards]
 
@@ -141,11 +143,13 @@ testRunWithReplace pulse = mdo
       void $ runWithReplace (pure ()) $ ffor eDebugHoverBoxAlpha $ \_ -> {-# SCC "cDebugBox_inner" #-} do
         start <- liftIO getCurrentTime
 
-        -- {-# SCC "cDebugBox_inner_runWithReplace" #-} do
-        --   {-# SCC "cDebugBox_inner_test" #-} do
-        --     liftIO $ putStrLn "test"
-        --   void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
-        --   void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
+        {-# SCC "cDebugBox_inner_runWithReplace" #-} do
+          {-# SCC "cDebugBox_inner_test" #-} do
+            liftIO $ putStrLn "test"
+          void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
+          void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
+
+        liftIO performMinorGC
 
         end <- liftIO getCurrentTime
         liftIO $ putStrLn $ show (diffUTCTime end start)
@@ -154,7 +158,7 @@ testRunWithReplace pulse = mdo
     cMouseEvents = do
       eMotionOcc :: Event t Int <- fmap fst <$> numberOccurrences pulse
       let eMove = ffor eMotionOcc $ \i -> initialCardsV V.! (i `mod` V.length initialCardsV)
-      tellEvent $ mergeWith (<>) [singletonNE MouseMove <$> eMove]
+      tellEvent $ mergeWith (<>) [singletonNE MouseMove <$> eMove] -- TODO: remove this merge
 
   (_, eCommands) <- runEventWriterT $ do
     cMouseEvents

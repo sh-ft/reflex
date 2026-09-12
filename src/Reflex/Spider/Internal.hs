@@ -1393,7 +1393,7 @@ coincidence a = unsafePerformIO $ do
 -- given read action. Runs inside the single 'runFrame' of
 -- 'runHostFrameFireAndRead', after the build and hold-init phases.
 propagateAndRead :: forall x b. HasSpiderTimeline x => [DSum (RootTrigger x) Identity] -> ResultM x b -> EventM x b
-propagateAndRead roots after = do
+propagateAndRead roots after = {-# SCC "propagateAndRead" #-} do
     rootsToPropagate <- forM roots $ \r@(RootTrigger (_, occRef, k) :=> a) -> do
       occBefore <- liftIO $ do
         occBefore <- readIORef occRef
@@ -1746,9 +1746,9 @@ newFanInt = do
     }
 
 fanInt :: HasSpiderTimeline x => Event x (IntMap a) -> EventSelectorInt x a
-fanInt p = unsafePerformIO $ do
+fanInt p = unsafePerformIO $ {-# SCC "fanInt" #-} do
   self <- newFanInt
-  pure $ EventSelectorInt $ \k -> Event $ \sub -> do
+  pure $ EventSelectorInt $ \k -> Event $ \sub -> {-# SCC "selectInt" #-} do
     isEmpty <- liftIO $ FastMutableIntMap.isEmpty (_fanInt_subscribers self)
     when isEmpty $ do -- This is the first subscriber, so we need to subscribe to our input
       let desc = "fanInt" <> showNodeId self <> ", k = "  <> show k
@@ -1783,11 +1783,19 @@ fanInt p = unsafePerformIO $ do
           FastMutableIntMap.insert (_fanInt_subscribers self) k b
           return b
         Just b -> return b
+      debug $ _fanInt_subscribers self
       ticket <- liftIO $ FastWeakBag.insert sub b
       currentOcc <- readIORef (_fanInt_occRef self)
 
       subscribed <- fanIntSubscribed ticket self
       pure $ SubscribeResult (EventSubscription (FastWeakBag.remove ticket) subscribed) $ IntMap.lookup k currentOcc
+  where
+    debug m = do
+      subsSize <- FastMutableIntMap.size m
+      l <- FastMutableIntMap.toList m
+      innerSizes <- forM (snd <$> l) FastWeakBag.size
+      let totalInnerSize = sum innerSizes
+      putStrLn $ "fanInt size: " <> show subsSize <> " (" <> show totalInnerSize <> ")"
 
 fanIntSubscribed :: FastWeakBagTicket k -> FanInt x a -> IO (EventSubscribed x)
 fanIntSubscribed ticket self = do
@@ -2254,11 +2262,11 @@ mergeGCheap' _getParent getInitialSubscribers updateFunc destroy d = Event $ \su
 
 
 mergeInt :: forall x a. (HasSpiderTimeline x) => DynamicS x (PatchIntMap (Event x a)) -> Event x (IntMap a)
-mergeInt = cacheEvent . mergeIntCheap
+mergeInt = {-# SCC "mergeInt" #-} cacheEvent . mergeIntCheap
 
 {-# INLINABLE mergeIntCheap #-}
 mergeIntCheap :: forall x a. (HasSpiderTimeline x) => DynamicS x (PatchIntMap (Event x a)) -> Event x (IntMap a)
-mergeIntCheap d = Event $ \sub -> do
+mergeIntCheap d = Event $ \sub -> {-# SCC "mergeIntCheap.subscribe" #-} do
   initialParents <- readBehaviorUntracked $ dynamicCurrent d
   accum <- liftIO $ FastMutableIntMap.newEmpty
   heightRef <- liftIO $ newIORef zeroHeight
@@ -2362,16 +2370,16 @@ newtype EventSelector x k = EventSelector { select :: forall a. k a -> Event x a
 newtype EventSelectorG x k v = EventSelectorG { selectG :: forall a. k a -> Event x (v a) }
 
 fanG :: (HasSpiderTimeline x, GCompare k) => Event x (DMap k v) -> EventSelectorG x k v
-fanG e = unsafePerformIO $ do
+fanG e = unsafePerformIO ${-# SCC "fanG" #-} do
   ref <- newIORef Nothing
   let f = Fan
         { fanParent = e
         , fanSubscribed = ref
         }
-  pure $ EventSelectorG $ \k -> eventFan k f
+  pure $ EventSelectorG $ \k -> {-# SCC "selectG" #-} eventFan k f
 
 runHoldInits :: HasSpiderTimeline x => IORef [SomeHoldInit x] -> IORef [SomeDynInit x] -> IORef [SomeMergeInit x] -> EventM x ()
-runHoldInits holdInitRef dynInitRef mergeInitRef = do
+runHoldInits holdInitRef dynInitRef mergeInitRef = {-# SCC "runHoldInits" #-} do
   holdInits <- liftIO $ readIORef holdInitRef
   dynInits <- liftIO $ readIORef dynInitRef
   mergeInits <- liftIO $ readIORef mergeInitRef
@@ -2428,8 +2436,8 @@ clearEventEnv (EventEnv toAssignRef holdInitRef dynInitRef mergeUpdateRef mergeI
 
 -- | Run an event action outside of a frame
 runFrame :: forall x a. HasSpiderTimeline x => EventM x a -> SpiderHost x a --TODO: This function also needs to hold the mutex
-runFrame a = SpiderHost $ do
-  let go = do
+runFrame a = SpiderHost $ {-# SCC "runFrame" #-} do
+  let go = {-# SCC "runFrame.go" #-} do
         result <- a
         runHoldInits (eventEnvHoldInits env) (eventEnvDynInits env) (eventEnvMergeInits env) -- This must happen before doing the assignments, in case subscribing a Hold causes existing Holds to be read by the newly-propagated events
         return result
@@ -2506,7 +2514,7 @@ runFrame a = SpiderHost $ do
     env = _spiderTimeline_eventEnv $ unSTE (spiderTimeline :: SpiderTimelineEnv x)
 
     clearOccurrences :: IO ()
-    clearOccurrences = do
+    clearOccurrences = {-# SCC "clearOccurences" #-} do
       toClear <- readIORef $ eventEnvClears env
       forM_ toClear $ \(Some (Clear ref)) -> {-# SCC "clear" #-} writeIORef ref Nothing
       toClearInt <- readIORef $ eventEnvIntClears env
@@ -2576,7 +2584,7 @@ deferRecalculateHeight recalculate = modifyIORef' (eventEnvPendingRecalculations
   where env = _spiderTimeline_eventEnv (unSTE (spiderTimeline :: SpiderTimelineEnv x))
 
 runPendingRecalculations :: EventEnv x -> IO ()
-runPendingRecalculations env = go
+runPendingRecalculations env = {-# SCC "runPendingRecalculations" #-} go
   where
     go = readIORef (eventEnvPendingRecalculations env) >>= \case
       [] -> pure ()
@@ -2825,7 +2833,7 @@ instance HasSpiderTimeline x => Reflex.Host.Class.MonadReflexHost (SpiderTimelin
   hostFrameAndRead build getTriggers readPhase = runHostFrameFireAndRead (runSpiderHostFrame build) (runSpiderHostFrame . getTriggers) (\a -> let Reflex.Spider.Internal.ReadPhase r = readPhase a in r)
 
 runHostFrameFireAndRead :: forall x a b. HasSpiderTimeline x => EventM x a -> (a -> EventM x [DSum (RootTrigger x) Identity]) -> (a -> ResultM x b) -> SpiderHost x b
-runHostFrameFireAndRead build getTriggers readPhase = do
+runHostFrameFireAndRead build getTriggers readPhase = {-# SCC "runHostFrameFireAndRead" #-} do
   let t = spiderTimeline :: SpiderTimelineEnv x
   SpiderHost $ withMVar (_spiderTimeline_lock (unSTE t)) $ \_ -> unSpiderHost $ runFrame $ do
     a <- build

@@ -213,7 +213,7 @@ hostPerformEventTAndRead :: forall t m a b acc0 stop0.
                   -> (b -> acc0 -> ReadPhase m (Either stop0 acc0))
                   -- ^ Perform-loop fold function.
                   -> m (a, b, Either stop0 acc0, FireCommand t m)
-hostPerformEventTAndRead builder initialHostFrame seed step0 = do
+hostPerformEventTAndRead builder initialHostFrame seed step0 = {-# SCC "hostPerformEventTAndRead" #-} do
   (response, responseTrigger) <- newEventWithTriggerRef
   let
     readStep :: forall stop' acc' request
@@ -221,7 +221,7 @@ hostPerformEventTAndRead builder initialHostFrame seed step0 = do
              -> (acc' -> ReadPhase m (Either stop' acc'))
              -> acc'
              -> ReadPhase m (Either stop' acc', Maybe (RequestData (PrimState (HostFrame t)) request))
-    readStep perfHandle step acc = do
+    readStep perfHandle step acc = {-# SCC "hostPerformEventTAndRead.readStep" #-}do
       ds <- step acc
       more <- sequence =<< readEvent perfHandle
       pure (ds, more)
@@ -233,7 +233,7 @@ hostPerformEventTAndRead builder initialHostFrame seed step0 = do
           -> m (Either stop' acc')
     drain _ _ (Left stop, _) = pure $ Left stop
     drain _ _ (Right acc, Nothing) = pure $ Right acc
-    drain perfHandle step (Right acc, Just toPerform) =
+    drain perfHandle step (Right acc, Just toPerform) = {-# SCC "hostPerformEventTAndRead.drain" #-}
       drain perfHandle step =<< do
         mrt <- readRef responseTrigger
         hostFrameAndRead
@@ -243,7 +243,7 @@ hostPerformEventTAndRead builder initialHostFrame seed step0 = do
   (a, b, perfHandle, frame0) <- hostFrameAndRead
     (do (result, eventToPerform) <- runRequesterT (unPerformEventT builder) response
         perfHandle' :: EventHandle t (RequestData (PrimState (HostFrame t)) request) <- subscribeEvent eventToPerform
-        b' <- initialHostFrame result
+        b' <- {-# SCC "hostPerformEventTAndRead.itialHostFrame" #-} initialHostFrame result
         pure (result, b', perfHandle'))
     (const (pure []))
     (\(result, b', perfHandle') -> (,,,) result b' perfHandle' <$> readStep perfHandle' (step0 b') seed)

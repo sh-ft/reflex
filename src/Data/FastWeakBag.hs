@@ -18,6 +18,7 @@ module Data.FastWeakBag
   , traverse
   , traverse_
   , remove
+  , size
   -- * Internal functions
   -- These will not always be available.
 #ifndef GHCJS_FAST_WEAK
@@ -114,6 +115,11 @@ foreign import javascript unsafe "(function(){ for(var i = 0; i < $1.tickets.len
 #else
 isEmpty bag = {-# SCC "isEmpty" #-} IntMap.null <$> readIORef (_weakBag_children bag)
 #endif
+
+size :: FastWeakBag a -> IO Int
+size wb = do
+  cs <- readIORef $ _weakBag_children wb
+  return $ IntMap.size cs
 
 {-# INLINE traverse_ #-}
 -- | Visit every node in the given list.  If new nodes are appended during the

@@ -152,7 +152,7 @@ class ( ReflexHost t
 -- using this function. The read callback can be used to read output events
 -- and perform a corresponding response action to the external event.
 fireEventsAndRead :: MonadReflexHost t m => [DSum (EventTrigger t) Identity] -> ReadPhase m a -> m a
-fireEventsAndRead inputs readPhase =
+fireEventsAndRead inputs readPhase = {-# SCC "fireEventsAndRead" #-}
   hostFrameAndRead (pure ()) (const (pure inputs)) (const readPhase)
 {-# INLINE fireEventsAndRead #-}
 
@@ -164,12 +164,12 @@ fireEventsAndRead inputs readPhase =
 -- This function is commonly used to set up the basic event network when the
 -- application starts up.
 runHostFrame :: MonadReflexHost t m => HostFrame t a -> m a
-runHostFrame hostFrame = hostFrameAndRead hostFrame (const (pure [])) pure
+runHostFrame hostFrame = {-# SCC "runHostFrame" #-}hostFrameAndRead hostFrame (const (pure [])) pure
 {-# INLINE runHostFrame #-}
 
 -- | Like 'fireEventsAndRead', but without reading any events.
 fireEvents :: MonadReflexHost t m => [DSum (EventTrigger t) Identity] -> m ()
-fireEvents dm = fireEventsAndRead dm $ return ()
+fireEvents dm = {-# SCC "fireEvents" #-} fireEventsAndRead dm $ return ()
 {-# INLINE fireEvents #-}
 
 -- | Create a new event and store its trigger in an 'IORef' while it's active.
