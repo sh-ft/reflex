@@ -243,7 +243,7 @@ hostPerformEventTAndRead builder initialHostFrame seed step0 = {-# SCC "hostPerf
   (a, b, perfHandle, frame0) <- hostFrameAndRead
     (do (result, eventToPerform) <- runRequesterT (unPerformEventT builder) response
         perfHandle' :: EventHandle t (RequestData (PrimState (HostFrame t)) request) <- subscribeEvent eventToPerform
-        b' <- {-# SCC "hostPerformEventTAndRead.itialHostFrame" #-} initialHostFrame result
+        b' <- {-# SCC "hostPerformEventTAndRead.initialHostFrame" #-} initialHostFrame result
         pure (result, b', perfHandle'))
     (const (pure []))
     (\(result, b', perfHandle') -> (,,,) result b' perfHandle' <$> readStep perfHandle' (step0 b') seed)

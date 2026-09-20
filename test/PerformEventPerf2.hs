@@ -63,7 +63,7 @@ singletonNE k = DMMap . DM.singleton k . (NE.:| [])
 main :: IO ()
 main = do
   start <- liftIO getCurrentTime
-  b1s <- runAppB testRunWithReplace $ map Just (replicate 500 $ Increment 'a')
+  b1s <- runAppB testRunWithReplace $ map Just (replicate 2 $ Increment 'a')
   -- mapM_ print b1s
   let !False = last (last b1s) == ["0a0","1b3","2c0","3d1","4e0"]
   end <- liftIO getCurrentTime
@@ -118,8 +118,10 @@ testRunWithReplace
   => Event t PatchMapTestAction
   -> m (Behavior t [String])
 testRunWithReplace pulse = mdo
+  performEvent_ $ ffor pulse $ const . liftIO $ putStrLn "pulse"
+
   let
-    initialCards = [0..1]
+    initialCards = [0..2]
     initialCardsV = V.fromList initialCards
     initialCardsM = M.fromList [(k, k) | k <- initialCards]
 
@@ -144,10 +146,10 @@ testRunWithReplace pulse = mdo
         start <- liftIO getCurrentTime
 
         {-# SCC "cDebugBox_inner_runWithReplace" #-} do
-          {-# SCC "cDebugBox_inner_test" #-} do
-            liftIO $ putStrLn "test"
+          -- {-# SCC "cDebugBox_inner_test" #-} do
+          --   liftIO $ putStrLn "test"
           void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
-          void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
+          -- void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
 
         liftIO performMinorGC
 
@@ -155,18 +157,23 @@ testRunWithReplace pulse = mdo
         liftIO $ putStrLn $ show (diffUTCTime end start)
         pure ()
 
-    cMouseEvents = do
-      eMotionOcc :: Event t Int <- fmap fst <$> numberOccurrences pulse
-      let eMove = ffor eMotionOcc $ \i -> initialCardsV V.! (i `mod` V.length initialCardsV)
-      tellEvent $ mergeWith (<>) [singletonNE MouseMove <$> eMove] -- TODO: remove this merge
+  --   cMouseEvents = do
+  --     eMotionOcc :: Event t Int <- fmap fst <$> numberOccurrences pulse
+  --     let eMove = ffor eMotionOcc $ \i -> initialCardsV V.! (i `mod` V.length initialCardsV)
+  --     tellEvent $ mergeWith (<>) [singletonNE MouseMove <$> eMove] -- TODO: remove this merge
 
-  (_, eCommands) <- runEventWriterT $ do
-    cMouseEvents
-    -- forM_ initialCards cCard
-    listHoldWithKey initialCardsM never $ \i _ -> cCard i
-  let
-    esCommand = fanG $ unDMMap <$> eCommands
-    eMouseMove = head . NE.toList <$> selectG esCommand MouseMove
+  -- (_, eCommands) <- runEventWriterT $ do
+  --   cMouseEvents
+  --   forM_ initialCards cCard
+  --   -- listHoldWithKey initialCardsM never $ \i _ -> cCard i
+  -- let
+  --   esCommand = fanG $ unDMMap <$> eCommands
+  --   eMouseMove = head . NE.toList <$> selectG esCommand MouseMove
+
+  -- listHoldWithKey initialCardsM never $ \i _ -> cCard i
+  forM_ initialCards cCard
+  eMotionOcc :: Event t Int <- fmap fst <$> numberOccurrences pulse
+  let eMouseMove = ffor eMotionOcc $ \i -> initialCardsV V.! (i `mod` V.length initialCardsV)
 
   -- performEvent_ $ ffor eCommands $ \p -> liftIO . putStrLn $ "eCommands" <> show p
 
