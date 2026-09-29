@@ -58,6 +58,8 @@ import qualified Data.Semigroup as S
 import Data.Unique.Tag.Local
 import Data.Tuple
 
+import Debug.Trace
+
 #if !MIN_VERSION_base(4,18,0)
 import Control.Monad.Identity
 #endif

@@ -119,6 +119,8 @@ import qualified Data.Patch.DMapWithMove as PatchDMapWithMove
 import Reflex.PerformEvent.Base (PerformEventT)
 import Prelude hiding (filter)
 
+import qualified Debug.Trace as D
+
 #ifdef DEBUG_TRACE_EVENTS
 import qualified Data.ByteString.Char8 as BS8
 import System.IO (stderr)
@@ -241,7 +243,7 @@ data EventSubscription x = EventSubscription
   }
 
 unsubscribe :: EventSubscription x -> IO ()
-unsubscribe (EventSubscription u _) = u
+unsubscribe (EventSubscription u _) = putStrLn "unsubscribe" >> u
 
 --------------------------------------------------------------------------------
 -- Event
@@ -1789,7 +1791,7 @@ fanInt p = unsafePerformIO $ {-# SCC "fanInt" #-} do
       currentOcc <- readIORef (_fanInt_occRef self)
 
       subscribed <- fanIntSubscribed ticket self
-      pure $ SubscribeResult (EventSubscription (FastWeakBag.remove ticket) subscribed) $ IntMap.lookup k currentOcc
+      pure $ SubscribeResult (EventSubscription (putStrLn "FastWeakBag.remove" >> FastWeakBag.remove ticket) subscribed) $ IntMap.lookup k currentOcc
   where
     debug m = do
       subsSize <- FastMutableIntMap.size m

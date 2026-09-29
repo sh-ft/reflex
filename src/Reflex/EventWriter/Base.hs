@@ -89,11 +89,11 @@ runEventWriterT :: forall t m w a. (Reflex t, Monad m, Semigroup w) => EventWrit
 runEventWriterT (EventWriterT a) = {-# SCC "runEventWriterT" #-} do
   (result, requests) <- {-# SCC "runEventWriterT_runStateT" #-} runStateT a mempty
   let !requestsL = {-# SCC "runEventWriterT_toList" #-} Deferred.toList requests
-  -- trace "runEventWriterT test" $ return (trace "runEventWriter result" result, mconcatCheap . reverse . trace ("runEventWriter Deferred.toList " <> show (length requestsL)) $ requestsL)
-  trace "runEventWriterT" $ return (result, {-# SCC "runEventWriterT_mconcatCheap" #-} mconcatCheap . reverse $ requestsL)
+  trace "runEventWriterT test" $ return (trace "runEventWriter result" result, mconcatCheap . reverse . trace ("runEventWriter Deferred.toList " <> show (length requestsL)) $ requestsL)
+  -- trace "runEventWriterT" $ return (result, {-# SCC "runEventWriterT_mconcatCheap" #-} mconcatCheap . reverse $ requestsL)
 
 instance (Reflex t, Monad m, Semigroup w) => EventWriter t w (EventWriterT t w m) where
-  tellEvent w = EventWriterT $ modify (<> Deferred.singleton w)
+  tellEvent w = trace "tellEvent" $ EventWriterT $ modify (<> Deferred.singleton w)
 
 instance MonadSample t m => MonadSample t (EventWriterT t w m) where
   sample = lift . sample

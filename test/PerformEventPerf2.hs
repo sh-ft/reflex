@@ -63,7 +63,7 @@ singletonNE k = DMMap . DM.singleton k . (NE.:| [])
 main :: IO ()
 main = do
   start <- liftIO getCurrentTime
-  b1s <- runAppB testRunWithReplace $ map Just (replicate 2 $ Increment 'a')
+  b1s <- runAppB testRunWithReplace $ map Just (replicate 10000 $ Increment 'a')
   -- mapM_ print b1s
   let !False = last (last b1s) == ["0a0","1b3","2c0","3d1","4e0"]
   end <- liftIO getCurrentTime
@@ -121,7 +121,7 @@ testRunWithReplace pulse = mdo
   performEvent_ $ ffor pulse $ const . liftIO $ putStrLn "pulse"
 
   let
-    initialCards = [0..2]
+    initialCards = [0..600]
     initialCardsV = V.fromList initialCards
     initialCardsM = M.fromList [(k, k) | k <- initialCards]
 
@@ -149,9 +149,12 @@ testRunWithReplace pulse = mdo
           -- {-# SCC "cDebugBox_inner_test" #-} do
           --   liftIO $ putStrLn "test"
           void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
+          void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
           -- void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
 
         liftIO performMinorGC
+        -- liftIO performGC
+        -- liftIO performMajorGC
 
         end <- liftIO getCurrentTime
         liftIO $ putStrLn $ show (diffUTCTime end start)
