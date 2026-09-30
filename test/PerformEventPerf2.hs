@@ -62,13 +62,13 @@ singletonNE k = DMMap . DM.singleton k . (NE.:| [])
 
 main :: IO ()
 main = do
-  start <- liftIO getCurrentTime
-  b1s <- runAppB testRunWithReplace $ map Just (replicate 10000 $ Increment 'a')
-  -- mapM_ print b1s
-  let !False = last (last b1s) == ["0a0","1b3","2c0","3d1","4e0"]
-  end <- liftIO getCurrentTime
-  liftIO $ putStrLn $ "total runtime: " <> show (diffUTCTime end start)
-  let !False = True
+  -- start <- liftIO getCurrentTime
+  -- b1s <- runAppB testRunWithReplace $ map Just (replicate 20000 $ Increment 'a')
+  -- -- mapM_ print b1s
+  -- let !False = last (last b1s) == ["0a0","1b3","2c0","3d1","4e0"]
+  -- end <- liftIO getCurrentTime
+  -- liftIO $ putStrLn $ "total runtime: " <> show (diffUTCTime end start)
+  -- let !False = True
   return ()
 
 
@@ -118,47 +118,49 @@ testRunWithReplace
   => Event t PatchMapTestAction
   -> m (Behavior t [String])
 testRunWithReplace pulse = mdo
-  -- performEvent_ $ ffor pulse $ const . liftIO $ putStrLn "pulse"
+  pulse' <- headE pulse
+  performEvent_ $ ffor pulse' $ const . liftIO $ putStrLn "pulse"
+  -- performEvent_ $ ffor pulse $ const . liftIO $ putStrLn "pulse2"
 
-  let
-    initialCards = [0..600]
-    initialCardsV = V.fromList initialCards
-    initialCardsM = M.fromList [(k, k) | k <- initialCards]
+  -- let
+  --   initialCards = [0..600]
+  --   initialCardsV = V.fromList initialCards
+  --   initialCardsM = M.fromList [(k, k) | k <- initialCards]
 
   -- performEvent_ $ ffor pulse $ \p -> liftIO . putStrLn $ "pulse " <> show p
 
-  let
-    esDebugHoverBoxAlpha = fanMap $ ffor eMouseMove $ \i -> M.singleton i ()
+  -- let
+  --   esDebugHoverBoxAlpha = fanMap $ ffor eMouseMove $ \i -> M.singleton i ()
 
-  let
-    cCard = cDebugBox
+  -- let
+  --   cCard = cDebugBox
     -- cCard index = do
     --   listHoldWithKey (M.singleton 0 0) never $ \_ _ -> cCell index
 
     -- cCell index = do
     --   snd <$> runWithReplace (cDebugBox index) never
 
-    cDebugBox index = {-# SCC "cDebugBox" #-} do
-      let eDebugHoverBoxAlpha = select esDebugHoverBoxAlpha (Const2 index)
-      -- performEvent_ $ ffor eDebugHoverBoxAlpha $ const . liftIO $ putStrLn "selectDebugHoverBoxAlpha"
+    -- cDebugBox index = {-# SCC "cDebugBox" #-} do
+    --   let eDebugHoverBoxAlpha = select esDebugHoverBoxAlpha (Const2 index)
+    --   -- performEvent_ $ ffor eDebugHoverBoxAlpha $ const . liftIO $ putStrLn "selectDebugHoverBoxAlpha"
 
-      void $ runWithReplace (pure ()) $ ffor eDebugHoverBoxAlpha $ \_ -> {-# SCC "cDebugBox_inner" #-} do
-        -- start <- liftIO getCurrentTime
+    --   void $ runWithReplace (pure ()) $ ffor eDebugHoverBoxAlpha $ \_ -> {-# SCC "cDebugBox_inner" #-} do
+    --     -- start <- liftIO getCurrentTime
 
-        {-# SCC "cDebugBox_inner_runWithReplace" #-} do
-          -- {-# SCC "cDebugBox_inner_test" #-} do
-          --   liftIO $ putStrLn "test"
-          void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
-          void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
-          -- void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
+    --     {-# SCC "cDebugBox_inner_runWithReplace" #-} do
+    --       -- {-# SCC "cDebugBox_inner_test" #-} do
+    --       --   liftIO $ putStrLn "test"
+    --       void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
+    --       void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
+    --       -- void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
 
-        -- liftIO performMinorGC
-        -- liftIO performGC
-        -- liftIO performMajorGC
+    --     -- liftIO performMinorGC
+    --     -- liftIO performGC
+    --     -- liftIO performMajorGC
 
-        -- end <- liftIO getCurrentTime
-        -- liftIO $ putStrLn $ show (diffUTCTime end start)
-        pure ()
+    --     -- end <- liftIO getCurrentTime
+    --     -- liftIO $ putStrLn $ show (diffUTCTime end start)
+    --     pure ()
 
   --   cMouseEvents = do
   --     eMotionOcc :: Event t Int <- fmap fst <$> numberOccurrences pulse
@@ -174,9 +176,9 @@ testRunWithReplace pulse = mdo
   --   eMouseMove = head . NE.toList <$> selectG esCommand MouseMove
 
   -- listHoldWithKey initialCardsM never $ \i _ -> cCard i
-  forM_ initialCards cCard
-  eMotionOcc :: Event t Int <- fmap fst <$> numberOccurrences pulse
-  let eMouseMove = ffor eMotionOcc $ \i -> initialCardsV V.! (i `mod` V.length initialCardsV)
+  -- forM_ initialCards cCard
+  -- eMotionOcc :: Event t Int <- fmap fst <$> numberOccurrences pulse
+  -- let eMouseMove = ffor eMotionOcc $ \i -> initialCardsV V.! (i `mod` V.length initialCardsV)
 
   -- performEvent_ $ ffor eCommands $ \p -> liftIO . putStrLn $ "eCommands" <> show p
 
