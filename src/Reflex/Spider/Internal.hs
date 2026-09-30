@@ -1723,6 +1723,7 @@ newtype EventSelectorInt x a = EventSelectorInt { selectInt :: Int -> Event x a 
 
 data FanInt x a = FanInt
   { _fanInt_subscribers :: {-# UNPACK #-} !(FastMutableIntMap (FastWeakBag (Subscriber x a))) --TODO: Clean up the keys in here when their child weak bags get empty --TODO: Remove our own subscription when the subscribers list is completely empty
+  , _fanInt_keys :: {-# UNPACK #-} !(IORef FanIntKeyCount)
   , _fanInt_subscriptionRef :: {-# UNPACK #-} !(IORef (EventSubscription x)) -- This should have a valid subscription iff subscribers is non-empty
   , _fanInt_occRef :: {-# UNPACK #-} !(IORef (IntMap a))
 #ifdef DEBUG_NODEIDS
@@ -1730,9 +1731,18 @@ data FanInt x a = FanInt
 #endif
   }
 
+data FanIntKeyCount = FanIntKeyCount
+  { _fanIntKeyCount_size :: !Int
+  , _fanIntKeyCount_pruneAt :: !Int
+  }
+
+fanIntPruneThreshold :: Int
+fanIntPruneThreshold = 100
+
 newFanInt :: IO (FanInt x a)
 newFanInt = do
   subscribers <- FastMutableIntMap.newEmpty --TODO: Clean up the keys in here when their child weak bags get empty --TODO: Remove our own subscription when the subscribers list is completely empty
+  keys <- newIORef $ FanIntKeyCount 0 fanIntPruneThreshold
   subscriptionRef <- newIORef $ error "fanInt: no subscription"
   occRef <- newIORef $ error "fanInt: no occurrence"
 #ifdef DEBUG_NODEIDS
@@ -1740,6 +1750,7 @@ newFanInt = do
 #endif
   return $ FanInt
     { _fanInt_subscribers = subscribers
+    , _fanInt_keys = keys
     , _fanInt_subscriptionRef = subscriptionRef
     , _fanInt_occRef = occRef
 #ifdef DEBUG_NODEIDS
@@ -1752,6 +1763,7 @@ fanInt p = unsafePerformIO $ {-# SCC "fanInt" #-} do
   putStrLn "fanInt"
   self <- newFanInt
   pure $ EventSelectorInt $ \k -> Event $ \sub -> {-# SCC "selectInt" #-} do
+    liftIO $ pruneFanIntKeys self
     isEmpty <- liftIO $ FastMutableIntMap.isEmpty (_fanInt_subscribers self)
     when isEmpty $ do -- This is the first subscriber, so we need to subscribe to our input
       let desc = "fanInt" <> showNodeId self <> ", k = "  <> show k
@@ -1784,6 +1796,7 @@ fanInt p = unsafePerformIO $ {-# SCC "fanInt" #-} do
         Nothing -> do
           b <- FastWeakBag.empty
           FastMutableIntMap.insert (_fanInt_subscribers self) k b
+          modifyIORef' (_fanInt_keys self) $ \(FanIntKeyCount n p) -> FanIntKeyCount (n + 1) p
           return b
         Just b -> return b
       debug $ _fanInt_subscribers self
@@ -1791,7 +1804,9 @@ fanInt p = unsafePerformIO $ {-# SCC "fanInt" #-} do
       currentOcc <- readIORef (_fanInt_occRef self)
 
       subscribed <- fanIntSubscribed ticket self
-      pure $ SubscribeResult (EventSubscription (putStrLn "FastWeakBag.remove" >> FastWeakBag.remove ticket) subscribed) $ IntMap.lookup k currentOcc
+      -- pure $ SubscribeResult (EventSubscription (putStrLn "FastWeakBag.remove" >> FastWeakBag.remove ticket) subscribed) $ IntMap.lookup k currentOcc
+      unsubscribedRef <- newIORef False
+      pure $ SubscribeResult (EventSubscription (unsubscribeFanInt self k b ticket unsubscribedRef) subscribed) $ IntMap.lookup k currentOcc
   where
     debug m = do
       subsSize <- FastMutableIntMap.size m
@@ -1799,6 +1814,62 @@ fanInt p = unsafePerformIO $ {-# SCC "fanInt" #-} do
       innerSizes <- forM (snd <$> l) FastWeakBag.size
       let totalInnerSize = sum innerSizes
       putStrLn $ "fanInt size: " <> show subsSize <> " (" <> show totalInnerSize <> ")"
+
+pruneFanIntKeys :: FanInt x a -> IO ()
+pruneFanIntKeys self = do
+  FanIntKeyCount size pruneAt <- readIORef (_fanInt_keys self)
+  when (size >= pruneAt) $ do
+    -- 'toList' is a snapshot, so deleting as we go is fine.
+    entries <- FastMutableIntMap.toList (_fanInt_subscribers self)
+    live <- foldM keepLive 0 entries
+    writeIORef (_fanInt_keys self) $! FanIntKeyCount live (max fanIntPruneThreshold (2 * live))
+    when (live == 0) $ teardownFanInt self
+  where
+    keepLive !live (k, b) = do
+      bagIsEmpty <- FastWeakBag.isEmpty b
+      if bagIsEmpty
+        then do
+          FastMutableIntMap.delete (_fanInt_subscribers self) k
+          return live
+        else return $ live + 1
+
+-- | Unsubscribe a single 'fanInt' subscriber, dropping its key if that was the
+-- last one holding it.  This is the prompt path; collected subscribers are
+-- cleaned up by 'pruneFanIntKeys' instead.
+unsubscribeFanInt
+  :: FanInt x a
+  -> Int
+  -> FastWeakBag (Subscriber x a)
+  -> FastWeakBagTicket (Subscriber x a)
+  -> IORef Bool
+  -> IO ()
+unsubscribeFanInt self k b ticket unsubscribedRef = do
+  -- This must be idempotent: an EventSubscription's unsubscribe action can be
+  -- run more than once, and a second run could otherwise drop a bag that a newer
+  -- subscriber had since installed at this key.
+  alreadyUnsubscribed <- atomicModifyIORef' unsubscribedRef $ \u -> (True, u)
+  unless alreadyUnsubscribed $ do
+    -- 'FastWeakBag.remove' finalizes synchronously, so the bag reflects the
+    -- removal by the time we test it.
+    FastWeakBag.remove ticket
+    bagIsEmpty <- FastWeakBag.isEmpty b
+    when bagIsEmpty $ do
+      FastMutableIntMap.delete (_fanInt_subscribers self) k
+      modifyIORef' (_fanInt_keys self) $ \(FanIntKeyCount n p) -> FanIntKeyCount (n - 1) p
+      noKeysLeft <- FastMutableIntMap.isEmpty (_fanInt_subscribers self)
+      when noKeysLeft $ teardownFanInt self
+  touch ticket
+
+-- | Release the 'FanInt''s subscription to its parent, once it has no keys
+-- left.  The next subscriber finds the map empty and resubscribes.
+teardownFanInt :: FanInt x a -> IO ()
+teardownFanInt self = do
+  unsubscribe =<< readIORef (_fanInt_subscriptionRef self)
+  -- An inert subscription rather than 'newFanInt''s error thunk, because being
+  -- torn down is a normal state to be in: this way a redundant teardown is a
+  -- no-op instead of a crash.
+  writeIORef (_fanInt_subscriptionRef self) $ EventSubscription (return ()) eventSubscribedNever
+  writeIORef (_fanInt_occRef self) IntMap.empty
 
 fanIntSubscribed :: FastWeakBagTicket k -> FanInt x a -> IO (EventSubscribed x)
 fanIntSubscribed ticket self = do

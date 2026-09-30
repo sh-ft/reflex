@@ -10,6 +10,7 @@ module Data.FastMutableIntMap
   , new
   , newEmpty
   , insert
+  , delete
   , isEmpty
   , getFrozenAndClear
   , size
@@ -54,6 +55,11 @@ newEmpty = FastMutableIntMap <$> newIORef IntMap.empty
 -- | Insert an element into a 'FastMutableIntMap' at the given key
 insert :: FastMutableIntMap a -> Int -> a -> IO ()
 insert (FastMutableIntMap r) k v = modifyIORef' r $ IntMap.insert k v
+
+-- | Remove the element at the given key from a 'FastMutableIntMap'; does
+-- nothing if the key is absent
+delete :: FastMutableIntMap a -> Int -> IO ()
+delete (FastMutableIntMap r) k = modifyIORef' r $ IntMap.delete k
 
 -- | Attempt to lookup an element by key in a 'FastMutableIntMap'
 lookup :: FastMutableIntMap a -> Int -> IO (Maybe a)
