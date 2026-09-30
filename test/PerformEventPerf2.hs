@@ -118,7 +118,7 @@ testRunWithReplace
   => Event t PatchMapTestAction
   -> m (Behavior t [String])
 testRunWithReplace pulse = mdo
-  performEvent_ $ ffor pulse $ const . liftIO $ putStrLn "pulse"
+  -- performEvent_ $ ffor pulse $ const . liftIO $ putStrLn "pulse"
 
   let
     initialCards = [0..600]
@@ -143,7 +143,7 @@ testRunWithReplace pulse = mdo
       -- performEvent_ $ ffor eDebugHoverBoxAlpha $ const . liftIO $ putStrLn "selectDebugHoverBoxAlpha"
 
       void $ runWithReplace (pure ()) $ ffor eDebugHoverBoxAlpha $ \_ -> {-# SCC "cDebugBox_inner" #-} do
-        start <- liftIO getCurrentTime
+        -- start <- liftIO getCurrentTime
 
         {-# SCC "cDebugBox_inner_runWithReplace" #-} do
           -- {-# SCC "cDebugBox_inner_test" #-} do
@@ -152,12 +152,12 @@ testRunWithReplace pulse = mdo
           void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
           -- void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
 
-        liftIO performMinorGC
+        -- liftIO performMinorGC
         -- liftIO performGC
         -- liftIO performMajorGC
 
-        end <- liftIO getCurrentTime
-        liftIO $ putStrLn $ show (diffUTCTime end start)
+        -- end <- liftIO getCurrentTime
+        -- liftIO $ putStrLn $ show (diffUTCTime end start)
         pure ()
 
   --   cMouseEvents = do

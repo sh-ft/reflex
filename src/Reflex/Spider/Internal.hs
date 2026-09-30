@@ -243,7 +243,7 @@ data EventSubscription x = EventSubscription
   }
 
 unsubscribe :: EventSubscription x -> IO ()
-unsubscribe (EventSubscription u _) = putStrLn "unsubscribe" >> u
+unsubscribe (EventSubscription u _) = u
 
 --------------------------------------------------------------------------------
 -- Event
@@ -1760,7 +1760,6 @@ newFanInt = do
 
 fanInt :: HasSpiderTimeline x => Event x (IntMap a) -> EventSelectorInt x a
 fanInt p = unsafePerformIO $ {-# SCC "fanInt" #-} do
-  putStrLn "fanInt"
   self <- newFanInt
   pure $ EventSelectorInt $ \k -> Event $ \sub -> {-# SCC "selectInt" #-} do
     liftIO $ pruneFanIntKeys self
@@ -1799,7 +1798,7 @@ fanInt p = unsafePerformIO $ {-# SCC "fanInt" #-} do
           modifyIORef' (_fanInt_keys self) $ \(FanIntKeyCount n p) -> FanIntKeyCount (n + 1) p
           return b
         Just b -> return b
-      debug $ _fanInt_subscribers self
+      -- debug $ _fanInt_subscribers self
       ticket <- liftIO $ FastWeakBag.insert sub b
       currentOcc <- readIORef (_fanInt_occRef self)
 
@@ -1998,7 +1997,6 @@ getSwitchSubscribed s sub = do
 
 cleanupSwitchSubscribed :: SwitchSubscribed x a -> IO ()
 cleanupSwitchSubscribed subscribed = do
-  putStrLn "*** cleanupSwitchSubscribed"
   unsubscribe =<< readIORef (switchSubscribedCurrentParent subscribed)
   finalize =<< readIORef (switchSubscribedOwnWeakInvalidator subscribed) -- We don't need to get invalidated if we're dead
   writeIORef (switchSubscribedCachedSubscribed subscribed) Nothing
@@ -2512,7 +2510,6 @@ clearEventEnv (EventEnv toAssignRef holdInitRef dynInitRef mergeUpdateRef mergeI
 -- | Run an event action outside of a frame
 runFrame :: forall x a. HasSpiderTimeline x => EventM x a -> SpiderHost x a --TODO: This function also needs to hold the mutex
 runFrame a = SpiderHost $ {-# SCC "runFrame" #-} do
-  liftIO $ putStrLn "runFrame"
   let go = {-# SCC "runFrame.go" #-} do
         result <- a
         runHoldInits (eventEnvHoldInits env) (eventEnvDynInits env) (eventEnvMergeInits env) -- This must happen before doing the assignments, in case subscribing a Hold causes existing Holds to be read by the newly-propagated events
