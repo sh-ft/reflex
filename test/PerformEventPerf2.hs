@@ -36,6 +36,7 @@ import qualified Data.Dependent.Map as DM
 import Data.GADT.Compare
 import Data.GADT.Show
 import Data.Typeable ((:~:)(Refl))
+import Data.IORef
 
 import Reflex
 import Reflex.EventWriter.Base
@@ -63,7 +64,7 @@ singletonNE k = DMMap . DM.singleton k . (NE.:| [])
 main :: IO ()
 main = do
   start <- liftIO getCurrentTime
-  b1s <- runAppB testRunWithReplace $ map Just (replicate 10000 $ Increment 'a')
+  b1s <- runAppB testRunWithReplace $ map Just (replicate 16 $ Increment 'a')
   -- mapM_ print b1s
   let !False = last (last b1s) == ["0a0","1b3","2c0","3d1","4e0"]
   end <- liftIO getCurrentTime
@@ -118,10 +119,10 @@ testRunWithReplace
   => Event t PatchMapTestAction
   -> m (Behavior t [String])
 testRunWithReplace pulse = mdo
-  -- performEvent_ $ ffor pulse $ const . liftIO $ putStrLn "pulse"
+  performEvent_ $ ffor pulse $ const . liftIO $ putStrLn "pulse"
 
   let
-    initialCards = [0..600]
+    initialCards = [0..3]
     initialCardsV = V.fromList initialCards
     initialCardsM = M.fromList [(k, k) | k <- initialCards]
 
@@ -129,6 +130,8 @@ testRunWithReplace pulse = mdo
 
   let
     esDebugHoverBoxAlpha = fanMap $ ffor eMouseMove $ \i -> M.singleton i ()
+
+  nextTag :: IORef Int <- liftIO $ newIORef 0
 
   let
     cCard = cDebugBox
@@ -145,12 +148,12 @@ testRunWithReplace pulse = mdo
       void $ runWithReplace (pure ()) $ ffor eDebugHoverBoxAlpha $ \_ -> {-# SCC "cDebugBox_inner" #-} do
         -- start <- liftIO getCurrentTime
 
-        {-# SCC "cDebugBox_inner_runWithReplace" #-} do
-          -- {-# SCC "cDebugBox_inner_test" #-} do
-          --   liftIO $ putStrLn "test"
-          void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
-          void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
-          -- void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
+        -- {-# SCC "cDebugBox_inner_runWithReplace" #-} do
+        --   -- {-# SCC "cDebugBox_inner_test" #-} do
+        --   --   liftIO $ putStrLn "test"
+        --   void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
+        --   void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
+        --   -- void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
 
         -- liftIO performMinorGC
         -- liftIO performGC
@@ -158,7 +161,18 @@ testRunWithReplace pulse = mdo
 
         -- end <- liftIO getCurrentTime
         -- liftIO $ putStrLn $ show (diffUTCTime end start)
-        pure ()
+
+        -- 1. This triggers unsubscribeFanInt after switch:
+        -- e <- performEvent $ ffor pulse $ const . liftIO $ putStrLn "pulse"
+        -- performEvent_ $ ffor e $ const . liftIO $ putStrLn "e"
+        -- 2. But this doesn't for some reason:
+        void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
+
+        -- tag <- liftIO $ atomicModifyIORef' nextTag $ \t -> (t + 1, t)
+        -- e <- performEvent $ ffor pulse $ const . liftIO $ putStrLn $ "p " <> show index <> "-" <> show tag
+        -- performEvent_ $ ffor e $ const . liftIO $ putStrLn $ "e " <> show index <> "-" <> show tag
+
+        -- pure ()
 
   --   cMouseEvents = do
   --     eMotionOcc :: Event t Int <- fmap fst <$> numberOccurrences pulse

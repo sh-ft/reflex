@@ -1798,7 +1798,7 @@ fanInt p = unsafePerformIO $ {-# SCC "fanInt" #-} do
           modifyIORef' (_fanInt_keys self) $ \(FanIntKeyCount n p) -> FanIntKeyCount (n + 1) p
           return b
         Just b -> return b
-      -- debug $ _fanInt_subscribers self
+      debug $ _fanInt_subscribers self
       ticket <- liftIO $ FastWeakBag.insert sub b
       currentOcc <- readIORef (_fanInt_occRef self)
 
@@ -1806,6 +1806,7 @@ fanInt p = unsafePerformIO $ {-# SCC "fanInt" #-} do
       -- pure $ SubscribeResult (EventSubscription (putStrLn "FastWeakBag.remove" >> FastWeakBag.remove ticket) subscribed) $ IntMap.lookup k currentOcc
       unsubscribedRef <- newIORef False
       pure $ SubscribeResult (EventSubscription (unsubscribeFanInt self k b ticket unsubscribedRef) subscribed) $ IntMap.lookup k currentOcc
+      -- pure $ SubscribeResult (EventSubscription (pure ()) subscribed) $ IntMap.lookup k currentOcc
   where
     debug m = do
       subsSize <- FastMutableIntMap.size m
@@ -1846,6 +1847,7 @@ unsubscribeFanInt self k b ticket unsubscribedRef = do
   -- This must be idempotent: an EventSubscription's unsubscribe action can be
   -- run more than once, and a second run could otherwise drop a bag that a newer
   -- subscriber had since installed at this key.
+  putStrLn "unsubscribeFanInt"
   alreadyUnsubscribed <- atomicModifyIORef' unsubscribedRef $ \u -> (True, u)
   unless alreadyUnsubscribed $ do
     -- 'FastWeakBag.remove' finalizes synchronously, so the bag reflects the
