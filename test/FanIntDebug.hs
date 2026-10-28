@@ -51,7 +51,7 @@ import System.Mem
 
 
 maxIterations :: Int
-maxIterations = 4
+maxIterations = 10
 
 main :: IO ()
 main = do
@@ -89,14 +89,28 @@ testFanInt pulse = mdo
   performEvent_ $ ffor pulse $ \i -> liftIO $ putStrLn $ "pulse " <> show i
 
   -- # 1
+  -- let
+  --   eResponses = ffor pulse $ \i -> TagMap.fromList $
+  --     [ unsafeTagFromId 0 :=> EventTag (selectTag esResponses (unsafeTagFromId i :: Tag t Int)) ]
+  --       <> [unsafeTagFromId j :=> IntTag j | j <- [1..maxIterations]]
+  --   esResponses = fanTag eResponses
+  --   eWidgets = unEventTag <$> selectTag esResponses (unsafeTagFromId 0 :: Tag t (Event t Int))
+  -- eRequests <- switchHold never eWidgets
+  -- performEvent_ $ ffor eRequests $ const . liftIO $ putStrLn "requests"
+
+  -- # 2
+  eInnerRequests <- V.forM (V.fromList [1..maxIterations]) $ \i -> do
+    let selectNever = unEventTag <$> selectTag esResponses (unsafeTagFromId (negate i) :: Tag t (Event t Int))
+    switchHold never selectNever
   let
-    eResponses = ffor pulse $ \i -> TagMap.fromList $
-      [ unsafeTagFromId 0 :=> EventTag (selectTag esResponses (unsafeTagFromId i :: Tag t Int)) ]
-        <> [unsafeTagFromId j :=> IntTag j | j <- [1..maxIterations]]
+    eResponses = ffor pulse $ \i -> TagMap.fromList
+      [ unsafeTagFromId 0 :=> EventTag (eInnerRequests V.! (i - 1))]
     esResponses = fanTag eResponses
-    eInnerRequests = unEventTag <$> selectTag esResponses (unsafeTagFromId 0 :: Tag t (Event t Int))
-  eRequests <- switchHold never eInnerRequests
+    eWidgets = unEventTag <$> selectTag esResponses (unsafeTagFromId 0 :: Tag t (Event t Int))
+  eRequests <- switchHold never eWidgets
   performEvent_ $ ffor eRequests $ const . liftIO $ putStrLn "requests"
+  -- performEvent_ $ ffor eResponses $ const . liftIO $ putStrLn "responses"
+  -- performEvent_ $ ffor eWidgets $ const . liftIO $ putStrLn "widgets"
 
   return $ constant []
 
@@ -116,9 +130,10 @@ testFanInt pulse = mdo
 -- requests :: Event [req] <- switchHold requestStream -- when the outer event of requestStream fires, switch unsubscribes from the old inner event and subscribes to the new one
 -- tellEvent requests
 --
--- tellEvent $ switchHold $ selectTag &> mergeInt [selectTag u']
+-- tellEvent $ switchHold $ selectTag &> mergeInt [selectTag &> u']
 
 -- # 2
 -- runWithReplace $ ffor e do
 --   runWithReplace $ ffor never (pure ())
-
+--
+-- tellEvent $ switchHold $ selectTag &> switchHold $ selectTag (-1)
