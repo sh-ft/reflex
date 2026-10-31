@@ -523,6 +523,13 @@ wrap tag getSpecificSubscribed sub = do
   let es = tag subd
   pure $ SubscribeResult (EventSubscription (WeakBag.remove sln >> touch sln) es) occ
 
+{-# INLINE wrapWithUnsub #-}
+wrapWithUnsub :: MonadIO m => (t -> EventSubscribed x) -> (Subscriber x a -> m (IO (), t, Maybe a)) -> Subscriber x a -> m (SubscribeResult x a)
+wrapWithUnsub tag getSpecificSubscribed sub = do
+  (unsub, subd, occ) <- getSpecificSubscribed sub
+  let es = tag subd
+  pure $ SubscribeResult (EventSubscription unsub es) occ
+
 eventRoot :: (GCompare k, HasSpiderTimeline x) => k a -> Root x k -> Event x a
 eventRoot !k !r = Event $ wrap eventSubscribedRoot $ liftIO . getRootSubscribed k r
 
@@ -536,7 +543,8 @@ eventFan :: (GCompare k, HasSpiderTimeline x) => k a -> Fan x k v -> Event x (v 
 eventFan !k !f = Event $ wrap eventSubscribedFan $ getFanSubscribed k f
 
 eventSwitch :: HasSpiderTimeline x => Switch x a -> Event x a
-eventSwitch !s = Event $ wrap eventSubscribedSwitch $ getSwitchSubscribed s
+-- eventSwitch !s = Event $ wrap eventSubscribedSwitch $ getSwitchSubscribed s
+eventSwitch !s = Event $ wrapWithUnsub eventSubscribedSwitch $ getSwitchSubscribed s
 
 eventCoincidence :: HasSpiderTimeline x => Coincidence x a -> Event x a
 eventCoincidence !c = Event $ wrap eventSubscribedCoincidence $ getCoincidenceSubscribed c
@@ -1865,6 +1873,7 @@ unsubscribeFanInt self k b ticket unsubscribedRef = do
 -- left.  The next subscriber finds the map empty and resubscribes.
 teardownFanInt :: FanInt x a -> IO ()
 teardownFanInt self = do
+  putStrLn "teardownFanInt"
   unsubscribe =<< readIORef (_fanInt_subscriptionRef self)
   -- An inert subscription rather than 'newFanInt''s error thunk, because being
   -- torn down is a normal state to be in: this way a redundant teardown is a
@@ -1949,14 +1958,14 @@ subscribeFanSubscribed k subscribed sub = do
     Just (FanSubscribedChildren list _ weakSelf) -> {-# SCC "hitSubscribeFanSubscribed" #-} WeakBag.insert sub list weakSelf cleanupFanSubscribed
 
 {-# INLINABLE getSwitchSubscribed #-}
-getSwitchSubscribed :: HasSpiderTimeline x => Switch x a -> Subscriber x a -> EventM x (WeakBagTicket, SwitchSubscribed x a, Maybe a)
+getSwitchSubscribed :: HasSpiderTimeline x => Switch x a -> Subscriber x a -> EventM x (IO (), SwitchSubscribed x a, Maybe a)
 getSwitchSubscribed s sub = do
   mSubscribed <- liftIO $ readIORef $ switchSubscribed s
   case mSubscribed of
     Just subscribed -> {-# SCC "hitSwitch" #-} liftIO $ do
       sln <- subscribeSwitchSubscribed subscribed sub
       occ <- readIORef $ switchSubscribedOccurrence subscribed
-      return (sln, subscribed, occ)
+      return (unsub sln subscribed, subscribed, occ)
     Nothing -> {-# SCC "missSwitch" #-} do
       subscribedRef <- liftIO $ newIORef $ error "getSwitchSubscribed: subscribed has not yet been created"
       subscribedUnsafe <- liftIO $ unsafeInterleaveIO $ readIORef subscribedRef
@@ -1995,7 +2004,13 @@ getSwitchSubscribed s sub = do
       liftIO $ writeIORef weakSelf =<< evaluate =<< mkWeakPtrWithDebug subscribed "switchSubscribedWeakSelf"
       liftIO $ writeIORef subscribedRef $! subscribed
       liftIO $ writeIORef (switchSubscribed s) $ Just subscribed
-      return (slnForSub, subscribed, parentOcc)
+      return (unsub slnForSub subscribed, subscribed, parentOcc)
+  where
+    unsub sln subscribed = do
+      putStrLn "unsubscribe switch"
+      WeakBag.remove sln
+      cleanupSwitchSubscribed subscribed
+      touch sln
 
 cleanupSwitchSubscribed :: SwitchSubscribed x a -> IO ()
 cleanupSwitchSubscribed subscribed = do
@@ -2438,7 +2453,9 @@ mergeIntCheap d = Event $ \sub -> {-# SCC "mergeIntCheap.subscribe" #-} do
     -- If we don't do this, there are certain cases where mergeCheap will fail to properly retain
     -- its subscription.
     liftIO $ writeIORef changeSubdRef (changeSubscriber, changeSubscription)
-  let unsubscribeAll = traverse_ (unsubscribe . snd) =<< FastMutableIntMap.toList parents
+  let unsubscribeAll = do
+        putStrLn "unsubscribe mergeInt"
+        traverse_ (unsubscribe . snd) =<< FastMutableIntMap.toList parents
   pure $ SubscribeResult (EventSubscription unsubscribeAll subscribed) occ
 
 newtype EventSelector x k = EventSelector { select :: forall a. k a -> Event x a }

@@ -24,7 +24,7 @@ import Control.Monad.Fix
 import Data.Maybe
 import qualified Data.Map as Map
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Control.Monad ((<=<), join, when, void, forM_)
+import Control.Monad ((<=<), join, when, void, forM_, forM)
 import Data.Functor.Misc (Const2(..))
 import Data.Time.Clock (getCurrentTime, diffUTCTime)
 import qualified Data.Map.Strict as M
@@ -101,16 +101,24 @@ testFanInt pulse = mdo
   -- # 2
   eInnerRequests <- V.forM (V.fromList [1..maxIterations]) $ \i -> do
     let selectNever = unEventTag <$> selectTag esResponses (unsafeTagFromId (negate i) :: Tag t (Event t Int))
+    -- let selectNever = never
     switchHold never selectNever
   let
-    eResponses = ffor pulse $ \i -> TagMap.fromList
+    eResponses = ffor pulse $ \i -> TagMap.fromList $
       [ unsafeTagFromId 0 :=> EventTag (eInnerRequests V.! (i - 1))]
+        -- <> [unsafeTagFromId (negate j) :=> EventTag pulse | j <- [1..maxIterations]]
     esResponses = fanTag eResponses
     eWidgets = unEventTag <$> selectTag esResponses (unsafeTagFromId 0 :: Tag t (Event t Int))
   eRequests <- switchHold never eWidgets
   performEvent_ $ ffor eRequests $ const . liftIO $ putStrLn "requests"
-  -- performEvent_ $ ffor eResponses $ const . liftIO $ putStrLn "responses"
-  -- performEvent_ $ ffor eWidgets $ const . liftIO $ putStrLn "widgets"
+  performEvent_ $ ffor eResponses $ const . liftIO $ putStrLn "responses"
+  performEvent_ $ ffor eWidgets $ const . liftIO $ putStrLn "widgets"
+
+  -- let esResponses = fanTag never
+  -- eInnerRequests <- V.forM (V.fromList [1..maxIterations]) $ \i -> do
+  --   let selectNever = unEventTag <$> selectTag esResponses (unsafeTagFromId (negate i) :: Tag t (Event t Int))
+  --   _ <- hold never selectNever
+  --   pure ()
 
   return $ constant []
 

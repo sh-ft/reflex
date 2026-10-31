@@ -1022,7 +1022,7 @@ fanMap = fan . fmap mapToDMap
 -- are absolutely sure you need to act on the new event in the coincidental
 -- case.
 switchHold :: (Reflex t, MonadHold t m) => Event t a -> Event t (Event t a) -> m (Event t a)
-switchHold ea0 eea = switch <$> hold ea0 eea
+switchHold ea0 eea = trace "switchHold" $ switch <$> hold ea0 eea
 
 -- | Switches to the new event whenever it receives one. Whenever a new event is
 -- provided, if it is firing, its value will be the resulting event's value; if
