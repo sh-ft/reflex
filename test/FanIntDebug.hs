@@ -89,30 +89,30 @@ testFanInt pulse = mdo
   performEvent_ $ ffor pulse $ \i -> liftIO $ putStrLn $ "pulse " <> show i
 
   -- # 1
-  -- let
-  --   eResponses = ffor pulse $ \i -> TagMap.fromList $
-  --     [ unsafeTagFromId 0 :=> EventTag (selectTag esResponses (unsafeTagFromId i :: Tag t Int)) ]
-  --       <> [unsafeTagFromId j :=> IntTag j | j <- [1..maxIterations]]
-  --   esResponses = fanTag eResponses
-  --   eWidgets = unEventTag <$> selectTag esResponses (unsafeTagFromId 0 :: Tag t (Event t Int))
-  -- eRequests <- switchHold never eWidgets
-  -- performEvent_ $ ffor eRequests $ const . liftIO $ putStrLn "requests"
-
-  -- # 2
-  eInnerRequests <- V.forM (V.fromList [1..maxIterations]) $ \i -> do
-    let selectNever = unEventTag <$> selectTag esResponses (unsafeTagFromId (negate i) :: Tag t (Event t Int))
-    -- let selectNever = never
-    switchHold never selectNever
   let
     eResponses = ffor pulse $ \i -> TagMap.fromList $
-      [ unsafeTagFromId 0 :=> EventTag (eInnerRequests V.! (i - 1))]
-        -- <> [unsafeTagFromId (negate j) :=> EventTag pulse | j <- [1..maxIterations]]
+      [ unsafeTagFromId 0 :=> EventTag (selectTag esResponses (unsafeTagFromId i :: Tag t Int)) ]
+        <> [unsafeTagFromId j :=> IntTag j | j <- [1..maxIterations]]
     esResponses = fanTag eResponses
     eWidgets = unEventTag <$> selectTag esResponses (unsafeTagFromId 0 :: Tag t (Event t Int))
   eRequests <- switchHold never eWidgets
   performEvent_ $ ffor eRequests $ const . liftIO $ putStrLn "requests"
-  performEvent_ $ ffor eResponses $ const . liftIO $ putStrLn "responses"
-  performEvent_ $ ffor eWidgets $ const . liftIO $ putStrLn "widgets"
+
+  -- # 2
+  -- eInnerRequests <- V.forM (V.fromList [1..maxIterations]) $ \i -> do
+  --   let selectNever = unEventTag <$> selectTag esResponses (unsafeTagFromId (negate i) :: Tag t (Event t Int))
+  --   -- let selectNever = never
+  --   switchHold never selectNever
+  -- let
+  --   eResponses = ffor pulse $ \i -> TagMap.fromList $
+  --     [ unsafeTagFromId 0 :=> EventTag (eInnerRequests V.! (i - 1))]
+  --       -- <> [unsafeTagFromId (negate j) :=> EventTag pulse | j <- [1..maxIterations]]
+  --   esResponses = fanTag eResponses
+  --   eWidgets = unEventTag <$> selectTag esResponses (unsafeTagFromId 0 :: Tag t (Event t Int))
+  -- eRequests <- switchHold never eWidgets
+  -- performEvent_ $ ffor eRequests $ const . liftIO $ putStrLn "requests"
+  -- performEvent_ $ ffor eResponses $ const . liftIO $ putStrLn "responses"
+  -- performEvent_ $ ffor eWidgets $ const . liftIO $ putStrLn "widgets"
 
   -- let esResponses = fanTag never
   -- eInnerRequests <- V.forM (V.fromList [1..maxIterations]) $ \i -> do

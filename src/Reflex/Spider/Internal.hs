@@ -2014,6 +2014,12 @@ getSwitchSubscribed s sub = do
 
 cleanupSwitchSubscribed :: SwitchSubscribed x a -> IO ()
 cleanupSwitchSubscribed subscribed = do
+  parent <- readIORef (switchSubscribedCurrentParent subscribed)
+  wc <- eventSubscribedWhoCreated $ _eventSubscription_subscribed parent
+  ps <- eventSubscribedGetParents $ _eventSubscription_subscribed parent
+  pswc <- mapM eventSubscribedWhoCreated ps
+  putStrLn $ "cleanupSwitchSubscribed " <> show wc <> " " <> show pswc
+
   unsubscribe =<< readIORef (switchSubscribedCurrentParent subscribed)
   finalize =<< readIORef (switchSubscribedOwnWeakInvalidator subscribed) -- We don't need to get invalidated if we're dead
   writeIORef (switchSubscribedCachedSubscribed subscribed) Nothing
@@ -2454,8 +2460,9 @@ mergeIntCheap d = Event $ \sub -> {-# SCC "mergeIntCheap.subscribe" #-} do
     -- its subscription.
     liftIO $ writeIORef changeSubdRef (changeSubscriber, changeSubscription)
   let unsubscribeAll = do
-        putStrLn "unsubscribe mergeInt"
-        traverse_ (unsubscribe . snd) =<< FastMutableIntMap.toList parents
+        ps <- FastMutableIntMap.toList parents
+        putStrLn $ "unsubscribe mergeInt with " <> show (length $ ps) <> " parents"
+        traverse_ (unsubscribe . snd) ps
   pure $ SubscribeResult (EventSubscription unsubscribeAll subscribed) occ
 
 newtype EventSelector x k = EventSelector { select :: forall a. k a -> Event x a }
@@ -2573,7 +2580,11 @@ runFrame a = SpiderHost $ {-# SCC "runFrame" #-} do
     -}
     writeIORef (switchSubscribedCurrentParent subscribed) $! subscription
     return oldSubscription
+  when (length mergeSubscriptionsToKill > 0) $
+    putStrLn $ "killing " <> show (length mergeSubscriptionsToKill) <> " merge subscriptions"
   liftIO $ mapM_ unsubscribe mergeSubscriptionsToKill
+  when (length switchSubscriptionsToKill > 0) $
+    putStrLn $ "killing " <> show (length switchSubscriptionsToKill) <> " switch subscriptions"
   liftIO $ mapM_ unsubscribe switchSubscriptionsToKill
   forM_ toReconnect $ \(SomeSwitchSubscribed subscribed) -> {-# SCC "switchSubscribed_2" #-} do
     EventSubscription _ subd' <- readIORef $ switchSubscribedCurrentParent subscribed

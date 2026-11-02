@@ -64,7 +64,7 @@ singletonNE k = DMMap . DM.singleton k . (NE.:| [])
 main :: IO ()
 main = do
   start <- liftIO getCurrentTime
-  b1s <- runAppB testRunWithReplace $ map Just (replicate 10 $ Increment 'a')
+  b1s <- runAppB testRunWithReplace $ map Just (replicate 3 $ Increment 'a')
   -- mapM_ print b1s
   let !False = last (last b1s) == ["0a0","1b3","2c0","3d1","4e0"]
   end <- liftIO getCurrentTime
@@ -166,7 +166,12 @@ testRunWithReplace pulse = mdo
         -- e <- performEvent $ ffor pulse $ const . liftIO $ putStrLn "pu"
         -- performEvent_ $ ffor e $ const . liftIO $ putStrLn "e"
         -- 2. But this doesn't for some reason:
-        void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
+        -- void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
+        let
+          testW = do
+            e <- performEvent $ ffor pulse $ const . liftIO $ putStrLn "pu"
+            performEvent_ $ ffor e $ const . liftIO $ putStrLn "e"
+        void $ runWithReplace (testW) $ ffor never (const $ pure ())
 
         -- tag <- liftIO $ atomicModifyIORef' nextTag $ \t -> (t + 1, t)
         -- e <- performEvent $ ffor pulse $ const . liftIO $ putStrLn $ "p " <> show index <> "-" <> show tag
