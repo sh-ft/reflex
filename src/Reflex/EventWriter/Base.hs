@@ -132,7 +132,7 @@ runWithReplaceEventWriterTWith :: forall m t w a b. (Reflex t, MonadHold t m, Se
                                -> EventWriterT t w m (a, Event t b)
 runWithReplaceEventWriterTWith f a0 a' = do
   (result0, result') <- f (runEventWriterT a0) $ fmapCheap runEventWriterT a'
-  tellEvent =<< switchHoldPromptOnly (snd result0) (fmapCheap snd result')
+  tellEvent =<< switchHold (snd result0) (fmapCheap snd result')
   return (fst result0, fmapCheap fst result')
 
 -- | Like 'runWithReplaceEventWriterTWith', but for 'sequenceIntMapWithAdjust'.

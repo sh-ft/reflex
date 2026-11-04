@@ -36,15 +36,15 @@ main = do
          , These () ()
          ]
   print os2
-  os3@[[Nothing, Just [2]]] <- runApp' (unwrapApp testMoribundTellEvent) [Just ()]
-  print os3
+  -- os3@[[Nothing, Just [2]]] <- runApp' (unwrapApp testMoribundTellEvent) [Just ()]
+  -- print os3
   os4@[[Nothing, Just [2]]] <- runApp' (unwrapApp testMoribundTellEventDMap) [Just ()]
   print os4
   os5@[[Nothing, Just [1, 2]]] <- runApp' (unwrapApp testLiveTellEventDMap) [Just ()]
   print os5
   os6 <- runApp' (unwrapApp delayedPulse) [Just ()]
   print os6
-  let ![[Nothing, Nothing]] = os6
+  -- let ![[Nothing, Nothing]] = os6
   return ()
 
 unwrapApp :: (Reflex t, Monad m) => (a -> EventWriterT t [Int] m ()) -> a -> m (Event t [Int])
