@@ -36,12 +36,15 @@ import qualified Data.Dependent.Map as DM
 import Data.GADT.Compare
 import Data.GADT.Show
 import Data.Typeable ((:~:)(Refl))
+import Data.IORef
 
 import Reflex
 import Reflex.EventWriter.Base
 import Reflex.Network
 import Reflex.Patch.MapWithMove
 import Test.Run
+
+import System.Mem
 
 
 -- Dependent multimap
@@ -62,7 +65,7 @@ main :: IO ()
 main = do
   start <- liftIO getCurrentTime
   b1s <- runAppB testRunWithReplace $ map Just (replicate 10000 $ Increment 'a')
-  mapM_ print b1s
+  -- mapM_ print b1s
   -- let !False = last (last b1s) == ["0a0","1b3","2c0","3d1","4e0"]
   -- end <- liftIO getCurrentTime
   -- liftIO $ putStrLn $ "total runtime: " <> show (diffUTCTime end start)
@@ -116,6 +119,8 @@ testRunWithReplace
   => Event t PatchMapTestAction
   -> m (Behavior t [String])
 testRunWithReplace pulse = mdo
+  performEvent_ $ ffor pulse $ const . liftIO $ putStrLn "pulse"
+
   let
     initialCards = [0..600]
     initialCardsV = V.fromList initialCards
@@ -126,6 +131,8 @@ testRunWithReplace pulse = mdo
   let
     esDebugHoverBoxAlpha = fanMap $ ffor eMouseMove $ \i -> M.singleton i ()
 
+  nextTag :: IORef Int <- liftIO $ newIORef 0
+
   let
     cCard = cDebugBox
     -- cCard index = do
@@ -134,32 +141,61 @@ testRunWithReplace pulse = mdo
     -- cCell index = do
     --   snd <$> runWithReplace (cDebugBox index) never
 
-    cDebugBox index = do
+    cDebugBox index = {-# SCC "cDebugBox" #-} do
       let eDebugHoverBoxAlpha = select esDebugHoverBoxAlpha (Const2 index)
       -- performEvent_ $ ffor eDebugHoverBoxAlpha $ const . liftIO $ putStrLn "selectDebugHoverBoxAlpha"
 
-      void $ runWithReplace (pure ()) $ ffor eDebugHoverBoxAlpha $ \_ -> do
-        start <- liftIO getCurrentTime
+      void $ runWithReplace (pure ()) $ ffor eDebugHoverBoxAlpha $ \_ -> {-# SCC "cDebugBox_inner" #-} do
+        -- start <- liftIO getCurrentTime
 
-        void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
-        void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
+        -- {-# SCC "cDebugBox_inner_runWithReplace" #-} do
+        --   -- {-# SCC "cDebugBox_inner_test" #-} do
+        --   --   liftIO $ putStrLn "test"
+        --   void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
+        --   void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
+        --   -- void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
 
-        end <- liftIO getCurrentTime
-        liftIO $ putStrLn $ show (diffUTCTime end start)
+        -- liftIO performMinorGC
+        -- liftIO performGC
+        -- liftIO performMajorGC
+
+        -- end <- liftIO getCurrentTime
+        -- liftIO $ putStrLn $ show (diffUTCTime end start)
+
+        -- 1. This triggers unsubscribeFanInt after switch:
+        -- e <- performEvent $ ffor pulse $ const . liftIO $ putStrLn "pu"
+        -- performEvent_ $ ffor e $ const . liftIO $ putStrLn "e"
+        -- 2. But this doesn't for some reason:
+        -- void $ runWithReplace (pure ()) $ ffor never (const $ pure ())
+        -- let
+        --   testW = do
+        --     e <- performEvent $ ffor pulse $ const . liftIO $ putStrLn "pu"
+        --     performEvent_ $ ffor e $ const . liftIO $ putStrLn "e"
+        -- void $ runWithReplace (testW) $ ffor never (const $ pure ())
+
+        -- tag <- liftIO $ atomicModifyIORef' nextTag $ \t -> (t + 1, t)
+        -- e <- performEvent $ ffor pulse $ const . liftIO $ putStrLn $ "p " <> show index <> "-" <> show tag
+        -- performEvent_ $ ffor e $ const . liftIO $ putStrLn $ "e " <> show index <> "-" <> show tag
+
         pure ()
 
-    cMouseEvents = do
-      eMotionOcc :: Event t Int <- fmap fst <$> numberOccurrences pulse
-      let eMove = ffor eMotionOcc $ \i -> initialCardsV V.! (i `mod` V.length initialCardsV)
-      tellEvent $ mergeWith (<>) [singletonNE MouseMove <$> eMove]
+  --   cMouseEvents = do
+  --     eMotionOcc :: Event t Int <- fmap fst <$> numberOccurrences pulse
+  --     let eMove = ffor eMotionOcc $ \i -> initialCardsV V.! (i `mod` V.length initialCardsV)
+  --     tellEvent $ mergeWith (<>) [singletonNE MouseMove <$> eMove] -- TODO: remove this merge
 
-  (_, eCommands) <- runEventWriterT $ do
-    cMouseEvents
-    -- forM_ initialCards cCard
-    listHoldWithKey initialCardsM never $ \i _ -> cCard i
-  let
-    esCommand = fanG $ unDMMap <$> eCommands
-    eMouseMove = head . NE.toList <$> selectG esCommand MouseMove
+  -- (_, eCommands) <- runEventWriterT $ do
+  --   cMouseEvents
+  --   forM_ initialCards cCard
+  --   -- listHoldWithKey initialCardsM never $ \i _ -> cCard i
+  -- let
+  --   esCommand = fanG $ unDMMap <$> eCommands
+  --   eMouseMove = head . NE.toList <$> selectG esCommand MouseMove
+
+  -- listHoldWithKey initialCardsM never $ \i _ -> cCard i
+  forM_ initialCards cCard
+  eMotionOcc :: Event t Int <- fmap fst <$> numberOccurrences pulse
+  let eMouseMove = ffor eMotionOcc $ \i -> initialCardsV V.! (i `mod` V.length initialCardsV)
 
   -- performEvent_ $ ffor eCommands $ \p -> liftIO . putStrLn $ "eCommands" <> show p
 

@@ -118,7 +118,8 @@ instance (ReflexHost t, PrimMonad (HostFrame t)) => Adjustable t (PerformEventT 
         runA (PerformEventT (RequesterT a)) = runEventWriterT $ runReaderT (unRequesterInternalT a) env
     (result0, requests0) <- lift $ runA a0
     newA <- requestingIdentity $ runA <$> a'
-    requests <- switchHoldPromptOnly requests0 $ fmapCheap snd newA
+    -- requests <- switchHoldPromptOnly requests0 $ fmapCheap snd newA
+    requests <- switchHold requests0 $ fmapCheap snd newA
     RequesterInternalT $ tellEvent requests
     pure (result0, fmapCheap fst newA)
   {-# INLINE traverseIntMapWithKeyWithAdjust #-}
