@@ -543,8 +543,8 @@ eventFan :: (GCompare k, HasSpiderTimeline x) => k a -> Fan x k v -> Event x (v 
 eventFan !k !f = Event $ wrap eventSubscribedFan $ getFanSubscribed k f
 
 eventSwitch :: HasSpiderTimeline x => Switch x a -> Event x a
--- eventSwitch !s = Event $ wrap eventSubscribedSwitch $ getSwitchSubscribed s
-eventSwitch !s = Event $ wrapWithUnsub eventSubscribedSwitch $ getSwitchSubscribed s
+eventSwitch !s = Event $ wrap eventSubscribedSwitch $ getSwitchSubscribed s
+-- eventSwitch !s = Event $ wrapWithUnsub eventSubscribedSwitch $ getSwitchSubscribed s
 
 eventCoincidence :: HasSpiderTimeline x => Coincidence x a -> Event x a
 eventCoincidence !c = Event $ wrap eventSubscribedCoincidence $ getCoincidenceSubscribed c
@@ -1827,6 +1827,7 @@ pruneFanIntKeys :: FanInt x a -> IO ()
 pruneFanIntKeys self = do
   FanIntKeyCount size pruneAt <- readIORef (_fanInt_keys self)
   when (size >= pruneAt) $ do
+    putStrLn $ "pruneFanIntKeys " <> show size <> " " <> show pruneAt
     -- 'toList' is a snapshot, so deleting as we go is fine.
     entries <- FastMutableIntMap.toList (_fanInt_subscribers self)
     live <- foldM keepLive 0 entries
@@ -1855,6 +1856,7 @@ unsubscribeFanInt self k b ticket unsubscribedRef = do
   -- This must be idempotent: an EventSubscription's unsubscribe action can be
   -- run more than once, and a second run could otherwise drop a bag that a newer
   -- subscriber had since installed at this key.
+  fail "unsubscribeFanInt"
   putStrLn "unsubscribeFanInt"
   alreadyUnsubscribed <- atomicModifyIORef' unsubscribedRef $ \u -> (True, u)
   unless alreadyUnsubscribed $ do
@@ -1958,14 +1960,16 @@ subscribeFanSubscribed k subscribed sub = do
     Just (FanSubscribedChildren list _ weakSelf) -> {-# SCC "hitSubscribeFanSubscribed" #-} WeakBag.insert sub list weakSelf cleanupFanSubscribed
 
 {-# INLINABLE getSwitchSubscribed #-}
-getSwitchSubscribed :: HasSpiderTimeline x => Switch x a -> Subscriber x a -> EventM x (IO (), SwitchSubscribed x a, Maybe a)
+getSwitchSubscribed :: HasSpiderTimeline x => Switch x a -> Subscriber x a -> EventM x (WeakBagTicket, SwitchSubscribed x a, Maybe a)
+-- getSwitchSubscribed :: HasSpiderTimeline x => Switch x a -> Subscriber x a -> EventM x (IO (), SwitchSubscribed x a, Maybe a)
 getSwitchSubscribed s sub = do
   mSubscribed <- liftIO $ readIORef $ switchSubscribed s
   case mSubscribed of
     Just subscribed -> {-# SCC "hitSwitch" #-} liftIO $ do
       sln <- subscribeSwitchSubscribed subscribed sub
       occ <- readIORef $ switchSubscribedOccurrence subscribed
-      return (unsub sln subscribed, subscribed, occ)
+      return (sln, subscribed, occ)
+      -- return (unsub sln subscribed, subscribed, occ)
     Nothing -> {-# SCC "missSwitch" #-} do
       subscribedRef <- liftIO $ newIORef $ error "getSwitchSubscribed: subscribed has not yet been created"
       subscribedUnsafe <- liftIO $ unsafeInterleaveIO $ readIORef subscribedRef
@@ -2004,7 +2008,8 @@ getSwitchSubscribed s sub = do
       liftIO $ writeIORef weakSelf =<< evaluate =<< mkWeakPtrWithDebug subscribed "switchSubscribedWeakSelf"
       liftIO $ writeIORef subscribedRef $! subscribed
       liftIO $ writeIORef (switchSubscribed s) $ Just subscribed
-      return (unsub slnForSub subscribed, subscribed, parentOcc)
+      return (slnForSub, subscribed, parentOcc)
+      -- return (unsub slnForSub subscribed, subscribed, parentOcc)
   where
     unsub sln subscribed = do
       putStrLn "unsubscribe switch"
@@ -2014,11 +2019,11 @@ getSwitchSubscribed s sub = do
 
 cleanupSwitchSubscribed :: SwitchSubscribed x a -> IO ()
 cleanupSwitchSubscribed subscribed = do
-  parent <- readIORef (switchSubscribedCurrentParent subscribed)
-  wc <- eventSubscribedWhoCreated $ _eventSubscription_subscribed parent
-  ps <- eventSubscribedGetParents $ _eventSubscription_subscribed parent
-  pswc <- mapM eventSubscribedWhoCreated ps
-  putStrLn $ "cleanupSwitchSubscribed " <> show wc <> " " <> show pswc
+  -- parent <- readIORef (switchSubscribedCurrentParent subscribed)
+  -- wc <- eventSubscribedWhoCreated $ _eventSubscription_subscribed parent
+  -- ps <- eventSubscribedGetParents $ _eventSubscription_subscribed parent
+  -- pswc <- mapM eventSubscribedWhoCreated ps
+  -- putStrLn $ "cleanupSwitchSubscribed " <> show wc <> " " <> show pswc
 
   unsubscribe =<< readIORef (switchSubscribedCurrentParent subscribed)
   finalize =<< readIORef (switchSubscribedOwnWeakInvalidator subscribed) -- We don't need to get invalidated if we're dead
