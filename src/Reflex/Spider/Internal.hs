@@ -1772,6 +1772,7 @@ fanInt p = unsafePerformIO $ {-# SCC "fanInt" #-} do
   pure $ EventSelectorInt $ \k -> Event $ \sub -> {-# SCC "selectInt" #-} do
     liftIO $ pruneFanIntKeys self
     isEmpty <- liftIO $ FastMutableIntMap.isEmpty (_fanInt_subscribers self)
+    -- liftIO $ clearFanIntKeys self
     when isEmpty $ do -- This is the first subscriber, so we need to subscribe to our input
       let desc = "fanInt" <> showNodeId self <> ", k = "  <> show k
       SubscribeResult subscription parentOcc <- subscribeAndRead p $ debugSubscriber' desc $ Subscriber
@@ -1841,6 +1842,14 @@ pruneFanIntKeys self = do
           FastMutableIntMap.delete (_fanInt_subscribers self) k
           return live
         else return $ live + 1
+
+clearFanIntKeys :: FanInt x a -> IO ()
+clearFanIntKeys self = do
+  FanIntKeyCount size pruneAt <- readIORef (_fanInt_keys self)
+  putStrLn $ "clearFanIntKeys " <> show size
+  -- FastMutableIntMap.for_ (_fanInt_subscribers self) $ \b ->
+  void $ FastMutableIntMap.getFrozenAndClear $ _fanInt_subscribers self
+  writeIORef (_fanInt_keys self) $! FanIntKeyCount 0 fanIntPruneThreshold
 
 -- | Unsubscribe a single 'fanInt' subscriber, dropping its key if that was the
 -- last one holding it.  This is the prompt path; collected subscribers are
