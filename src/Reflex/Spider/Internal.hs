@@ -598,13 +598,15 @@ eventFan !k p !self = Event $ \sub -> do
     else liftIO $ fromMaybe (error "fan: a key has a subscriber, but the parent is not subscribed")
                   <$!> readIORef (_fan_subscriptionRef self)
   liftIO $ do
-    subscribers <- readIORef (_fan_subscribers self)
+    -- subscribers <- readIORef (_fan_subscribers self)
+    let subscribers = mapEmpty
     bag <- case mapLookup k subscribers of
       Nothing -> do
         bag <- WeakBag.empty
         writeIORef (_fan_subscribers self) $! mapInsert k (FanSubscribers bag) subscribers
         pure bag
       Just (FanSubscribers bag) -> pure bag
+    debug subscribers
     ticket <- WeakBag.insert sub bag (_fan_weakSelf self) $ \fan -> do
       modifyIORef' (_fan_subscribers fan) $ mapDelete k
       noKeys <- mapNull <$> readIORef (_fan_subscribers fan)
@@ -622,6 +624,15 @@ eventFan !k p !self = Event $ \sub -> do
 #endif
           }
     pure $ SubscribeResult (EventSubscription (WeakBag.remove ticket >> touch ticket) subscribed) $ mapLookup k =<< currentOcc
+
+  where
+    debug m = do
+      let subsSize = mapSize m
+      putStrLn $ "fanInt size: " <> show subsSize
+      -- l <- FastMutableIntMap.toList m
+      -- innerSizes <- forM (snd <$> l) FastWeakBag.size
+      -- let totalInnerSize = sum innerSizes
+      -- putStrLn $ "fanInt size: " <> show subsSize <> " (" <> show totalInnerSize <> ")"
 
 eventHold :: Hold x p -> Event x p
 eventHold !h = Event $ subscribeHoldEvent h
