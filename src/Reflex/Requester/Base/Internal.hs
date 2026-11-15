@@ -10,16 +10,51 @@
 {-# LANGUAGE RecursiveDo #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE InstanceSigs #-}
-#ifdef USE_REFLEX_OPTIMIZER
-{-# OPTIONS_GHC -fplugin=Reflex.Optimizer #-}
-#endif
+
+-- | This module provides 'RequesterT', the standard implementation of
+-- 'Requester'.
 module Reflex.Requester.Base.Internal where
 
-import Reflex.Class
+import Control.Monad
+import Control.Monad.Catch (MonadCatch, MonadMask, MonadThrow)
+import Control.Monad.Exception
+import Control.Monad.Fix
+import Control.Monad.Identity
+import Control.Monad.Morph
+import Control.Monad.Primitive
+import Control.Monad.Reader
+import Control.Monad.Ref
+import Control.Monad.State.Strict
+import Data.Bits
+import Data.Coerce
+import Data.Constraint
+import Data.Dependent.Map (DMap)
+import qualified Data.Dependent.Map as DMap
+import Data.Dependent.Sum (DSum (..))
+import Data.Functor.Compose
+import Data.Functor.Misc
+import Data.IntMap.Strict (IntMap)
+import qualified Data.IntMap.Strict as IntMap
+import Data.Kind (Type)
+import Data.Map (Map)
+import qualified Data.Map as Map
+import Data.Proxy
+import Data.Some (Some (Some))
+import Data.Type.Equality
+import GHC.Exts (Any)
+import Unsafe.Coerce
+
+#if !MIN_VERSION_base(4,18,0)
+import Control.Applicative (liftA2)
+import Data.Monoid ((<>))
+#endif
+
 import Reflex.Adjustable.Class
+import Reflex.Class
 import Reflex.Dynamic
 import Reflex.Host.Class
 import Reflex.PerformEvent.Class
@@ -29,18 +64,6 @@ import Reflex.TriggerEvent.Class
 import Reflex.EventWriter.Base
 import Reflex.EventWriter.Class
 
-import Control.Applicative (liftA2)
-import Control.Monad.Exception
-import Control.Monad.Fail
-import Control.Monad.Identity
-import Control.Monad.Primitive
-import Control.Monad.Reader
-import Control.Monad.Ref
-import Control.Monad.State
-import Control.Monad.Fix
-import Control.Monad.Catch (MonadMask, MonadThrow, MonadCatch)
-import Data.Coerce
-import Data.Dependent.Sum (DSum (..))
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.List.NonEmpty.Deferred (NonEmptyDeferred)
 import qualified Data.List.NonEmpty.Deferred as NonEmptyDeferred

@@ -1,6 +1,6 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
@@ -12,6 +12,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+
 module Main where
 
 import Control.Lens hiding (has)
@@ -28,7 +29,7 @@ import Data.Dependent.Sum
 import Data.Functor.Misc
 import Data.List (words)
 import Data.Map (Map)
-import qualified Data.Map as M
+import qualified Data.Map as Map
 #if !MIN_VERSION_these(4,11,0)
 import Data.Semigroup ((<>))
 #endif
@@ -64,16 +65,12 @@ instance Show (TestRequest a) where
 
 main :: IO ()
 main = do
-  os1 <- runApp' (unwrapApp testOrdering) $
-    [ Just ()
-    ]
-  --print os1
-  os2 <- runApp' (unwrapApp testSimultaneous) $ map Just $
-    [ This ()
-    , That ()
-    , This ()
-    , These () ()
-    ]
+  os1 <-
+    runApp' (unwrapApp testOrdering) [Just ()]
+  print os1
+  os2 <-
+    runApp' (unwrapApp testSimultaneous) $
+      map Just [This (), That (), This (), These () ()]
   print os2
   os3 <- runApp' (unwrapApp testMoribundRequest) [Just ()]
   print os3
@@ -99,11 +96,11 @@ main = do
   -- let ![[Nothing, Just [2]]] = os4
   -- let ![[Nothing, Just [1, 2]]] = os5
   -- -- let ![[Nothing, Nothing]] = os6 -- TODO re-enable this test after issue #233 has been resolved
-  -- let !(Just [(-9223372036854775808,"2")]) = M.toList <$> head (head os7)
-  -- let !(Just [(-9223372036854775808,"dcba")]) = M.toList <$> head (head os8)
+  -- let !(Just [(-9223372036854775808,"2")]) = Map.toList <$> head (head os7)
+  -- let !(Just [(-9223372036854775808,"dcba")]) = Map.toList <$> head (head os8)
   -- let ![[Nothing,Just "0:1"],[Nothing,Just "1:2"],[Nothing,Just "2:3"]] = os9
-  -- let !(Just [(-9223372036854775808,"2")]) = M.toList <$> head (head os10)
-  -- let !(Just [(-9223372036854775808,"oyoy")]) = M.toList <$> head (head os11)
+  -- let !(Just [(-9223372036854775808,"2")]) = Map.toList <$> head (head os10)
+  -- let !(Just [(-9223372036854775808,"oyoy")]) = Map.toList <$> head (head os11)
 
   return ()
 
@@ -121,32 +118,36 @@ unwrapApp x appIn = do
       unwrapRequests (RequestData _ es) = fmap (\(RequestEnvelope _ (RequestInt i)) -> i) $ toList es
   return $ fmap unwrapRequests e
 
-testOrdering :: ( Response m ~ Identity
-                , Request m ~ RequestInt
-                , Requester t m
-                , Adjustable t m)
-             => Event t ()
-             -> m ()
-testOrdering pulse = forM_ [10,9..1] $ \i ->
+testOrdering
+  :: ( Response m ~ Identity
+     , Request m ~ RequestInt
+     , Requester t m
+     , Adjustable t m
+     )
+  => Event t ()
+  -> m ()
+testOrdering pulse = forM_ [10, 9 .. 1] $ \i ->
   requestingIdentity (RequestInt i <$ pulse)
 
-testSimultaneous :: ( Response m ~ Identity
-                    , Request m ~ RequestInt
-                    , Requester t m
-                    , Adjustable t m)
-                 => Event t (These () ())
-                 -> m ()
+testSimultaneous
+  :: ( Response m ~ Identity
+     , Request m ~ RequestInt
+     , Requester t m
+     , Adjustable t m
+     )
+  => Event t (These () ())
+  -> m ()
 testSimultaneous pulse = do
   let tellE = fmapMaybe (^? here) pulse
       switchE = fmapMaybe (^? there) pulse
-  forM_ [1,3..9] $ \i -> runWithReplace (requestingIdentity (RequestInt i <$ tellE)) $ ffor switchE $ \_ ->
-    requestingIdentity (RequestInt (i+1) <$ tellE)
+  forM_ [1, 3 .. 9] $ \i -> runWithReplace (requestingIdentity (RequestInt i <$ tellE)) $ ffor switchE $ \_ ->
+    requestingIdentity (RequestInt (i + 1) <$ tellE)
 
 -- | Test that a widget requesting and event which fires at the same time it has been replaced
 -- doesn't count along with the new widget.
 testMoribundRequest
   :: forall t m
-  .  ( Reflex t
+   . ( Reflex t
      , Adjustable t m
      , MonadHold t m
      , MonadFix m
@@ -164,7 +165,7 @@ testMoribundRequest pulse = do
 -- | The equivalent of 'testMoribundRequest' for 'traverseDMapWithKeyWithAdjust'.
 testMoribundRequestDMap
   :: forall t m
-  .  ( Reflex t
+   . ( Reflex t
      , Adjustable t m
      , MonadHold t m
      , MonadFix m
@@ -180,15 +181,15 @@ testMoribundRequestDMap pulse = do
       (_, rwrFinished :: Event t (PatchDMap (Const2 () Int) Identity)) <-
         traverseDMapWithKeyWithAdjust
           (\(Const2 ()) (Identity v) -> Identity . const v <$> requestIntOnReplace v)
-          (mapToDMap $ M.singleton () 1)
-          ((PatchDMap $ DMap.map (ComposeMaybe . Just) $ mapToDMap $ M.singleton () 2) <$ pulse)
+          (mapToDMap $ Map.singleton () 1)
+          (PatchDMap (DMap.map (ComposeMaybe . Just) $ mapToDMap $ Map.singleton () 2) <$ pulse)
   return ()
 
 -- | Ensures that elements which are _not_ removed can still fire requests
 -- during the same frame as other elements are updated.
 testLiveRequestDMap
   :: forall t m
-  .  ( Reflex t
+   . ( Reflex t
      , Adjustable t m
      , MonadHold t m
      , MonadFix m
@@ -204,13 +205,13 @@ testLiveRequestDMap pulse = do
       (_, rwrFinished :: Event t (PatchDMap (Const2 Int ()) Identity)) <-
         traverseDMapWithKeyWithAdjust
           (\(Const2 k) (Identity ()) -> Identity <$> requestIntOnReplace k)
-          (mapToDMap $ M.singleton 1 ())
-          ((PatchDMap $ DMap.map (ComposeMaybe . Just) $ mapToDMap $ M.singleton 2 ()) <$ pulse)
+          (mapToDMap $ Map.singleton 1 ())
+          (PatchDMap (DMap.map (ComposeMaybe . Just) $ mapToDMap $ Map.singleton 2 ()) <$ pulse)
   return ()
 
 delayedPulse
   :: forall t m
-  .  ( Reflex t
+   . ( Reflex t
      , Adjustable t m
      , MonadHold t m
      , MonadFix m
@@ -222,9 +223,9 @@ delayedPulse
   => Event t ()
   -> m ()
 delayedPulse pulse = void $ flip runWithReplace (pure () <$ pulse) $ do
-    -- This has the effect of delaying pulse' from pulse
-    (_, pulse') <- runWithReplace (pure ()) $ pure (RequestInt 1) <$ pulse
-    requestingIdentity pulse'
+  -- This has the effect of delaying pulse' from pulse
+  (_, pulse') <- runWithReplace (pure ()) $ pure (RequestInt 1) <$ pulse
+  requestingIdentity pulse'
 
 testMatchRequestsWithResponses
   :: forall m t req a
@@ -243,12 +244,13 @@ testMatchRequestsWithResponses
   => Event t (req a) -> m (Event t (Map Int String))
 testMatchRequestsWithResponses pulse = mdo
   (_, requests) <- runRequesterT (requesting pulse) responses
-  let rawResponseMap = M.map (\v ->
+  let rawResponseMap = Map.map (\v ->
         case words v of
           ["reverse", str] -> reverse str
           ["increment", i] -> show $ succ $ (read i :: Int)
+          _ -> error $ "testMatchRequestsWithResponses: unexpected request " <> show v
         ) <$> rawRequestMap
-  (rawRequestMap, responses) <- matchResponsesWithRequests reqEncoder requests (head . M.toList <$> rawResponseMap)
+  (rawRequestMap, responses) <- matchResponsesWithRequests reqEncoder requests (head . Map.toList <$> rawResponseMap)
   pure rawResponseMap
   where
     reqEncoder :: forall a. req a -> (String, String -> Maybe a)

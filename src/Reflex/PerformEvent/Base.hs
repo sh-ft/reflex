@@ -1,5 +1,3 @@
--- | This module provides 'PerformEventT', the standard implementation of
--- 'PerformEvent'.
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -16,6 +14,8 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 
+-- | This module provides 'PerformEventT', the standard implementation of
+-- 'PerformEvent'.
 module Reflex.PerformEvent.Base
   ( PerformEventT (..)
   , FireCommand (..)
@@ -23,15 +23,6 @@ module Reflex.PerformEvent.Base
   , hostPerformEventTAndRead
   , hostPerformEventT
   ) where
-
-import Reflex.Adjustable.Class
-import Reflex.Class
-import Reflex.Host.Class
-import Reflex.PerformEvent.Class
-import Reflex.Requester.Base.Internal
-import Reflex.Requester.Class
-import Reflex.EventWriter.Class
-import Reflex.EventWriter.Base
 
 import Control.Monad (void)
 import Control.Monad.Catch (MonadCatch, MonadMask, MonadThrow)
@@ -60,6 +51,16 @@ import Data.Tuple
 
 import Debug.Trace
 
+import Reflex.Adjustable.Class
+import Reflex.Class
+import Reflex.Host.Class
+import Reflex.PerformEvent.Class
+import Reflex.Requester.Base
+import Reflex.Requester.Base.Internal
+import Reflex.Requester.Class
+import Reflex.EventWriter.Class
+import Reflex.EventWriter.Base
+
 #if !MIN_VERSION_base(4,18,0)
 import Control.Monad.Identity
 #endif
@@ -75,7 +76,7 @@ import Control.Monad.Identity
 newtype FireCommand t m = FireCommand
   { runFireCommandAndRead
       :: forall stop acc
-      .  [DSum (EventTrigger t) Identity]
+       . [DSum (EventTrigger t) Identity]
       -> acc
       -> (acc -> ReadPhase m (Either stop acc))
       -> m (Either stop acc)
@@ -87,7 +88,7 @@ runFireCommand fc triggers = void $ runFireCommandAndRead fc triggers () (\_ -> 
 
 -- | Provides a basic implementation of 'PerformEvent'.  Note that, despite the
 -- name, 'PerformEventT' is not an instance of 'MonadTrans'.
-newtype PerformEventT t m a = PerformEventT { unPerformEventT :: RequesterT t (HostFrame t) Identity (HostFrame t) a }
+newtype PerformEventT t m a = PerformEventT {unPerformEventT :: RequesterT t (HostFrame t) Identity (HostFrame t) a}
 
 deriving instance ReflexHost t => Functor (PerformEventT t m)
 deriving instance ReflexHost t => Applicative (PerformEventT t m)
@@ -107,9 +108,9 @@ instance (PrimMonad (HostFrame t), ReflexHost t) => PrimMonad (PerformEventT t m
 
 instance (ReflexHost t, Ref m ~ Ref IO, Monad (HostFrame t), PrimMonad (HostFrame t)) => PerformEvent t (PerformEventT t m) where
   type Performable (PerformEventT t m) = HostFrame t
-  {-# INLINABLE performEvent_ #-}
+  {-# INLINEABLE performEvent_ #-}
   performEvent_ = PerformEventT . requesting_
-  {-# INLINABLE performEvent #-}
+  {-# INLINEABLE performEvent #-}
   performEvent = PerformEventT . requestingIdentity
 
 instance (ReflexHost t, PrimMonad (HostFrame t)) => Adjustable t (PerformEventT t m) where
@@ -181,9 +182,9 @@ concatMapMaybe m = case Map.elems m of
   h : t -> Just $ sconcat $ h :| t
 
 instance ReflexHost t => MonadReflexCreateTrigger t (PerformEventT t m) where
-  {-# INLINABLE newEventWithTrigger #-}
+  {-# INLINEABLE newEventWithTrigger #-}
   newEventWithTrigger = PerformEventT . lift . newEventWithTrigger
-  {-# INLINABLE newFanEventWithTrigger #-}
+  {-# INLINEABLE newFanEventWithTrigger #-}
   newFanEventWithTrigger f = PerformEventT $ lift $ newFanEventWithTrigger f
 
 -- | Handles the frame lifecycle for a 'PerformEventT' program.
@@ -202,7 +203,7 @@ instance ReflexHost t => MonadReflexCreateTrigger t (PerformEventT t m) where
 -- repeats. It returns the setup results, the folded observation of the frame-0
 -- settle, and a 'FireCommand' for subsequent frames.
 
-{-# INLINABLE hostPerformEventTAndRead #-}
+{-# INLINEABLE hostPerformEventTAndRead #-}
 hostPerformEventTAndRead :: forall t m a b acc0 stop0.
                      ( MonadReflexHost t m
                      , MonadRef m
@@ -262,46 +263,47 @@ hostPerformEventTAndRead builder initialHostFrame seed step0 = {-# SCC "hostPerf
 
 -- | Like 'hostPerformEventTAndRead', but without observing the frame in which
 -- the network is built.
-{-# INLINABLE hostPerformEventT #-}
-hostPerformEventT :: forall t m a.
-                     ( MonadReflexHost t m
-                     , MonadRef m
-                     , Ref m ~ Ref IO
-                     , PrimMonad (HostFrame t)
-                     )
-                  => PerformEventT t m a
-                  -> m (a, FireCommand t m)
+{-# INLINEABLE hostPerformEventT #-}
+hostPerformEventT
+  :: forall t m a
+   . ( MonadReflexHost t m
+     , MonadRef m
+     , Ref m ~ Ref IO
+     , PrimMonad (HostFrame t)
+     )
+  => PerformEventT t m a
+  -> m (a, FireCommand t m)
 hostPerformEventT builder = do
   (a, _, _, fc) <- hostPerformEventTAndRead builder (const $ pure ()) () (\_ _ -> pure $ Right ())
   pure (a, fc)
 
 instance ReflexHost t => MonadSample t (PerformEventT t m) where
-  {-# INLINABLE sample #-}
+  {-# INLINEABLE sample #-}
   sample = PerformEventT . lift . sample
 
 instance ReflexHost t => MonadHold t (PerformEventT t m) where
-  {-# INLINABLE hold #-}
+  {-# INLINEABLE hold #-}
   hold v0 v' = PerformEventT $ lift $ hold v0 v'
-  {-# INLINABLE holdDyn #-}
+  {-# INLINEABLE holdDyn #-}
   holdDyn v0 v' = PerformEventT $ lift $ holdDyn v0 v'
-  {-# INLINABLE holdIncremental #-}
+  {-# INLINEABLE holdIncremental #-}
   holdIncremental v0 v' = PerformEventT $ lift $ holdIncremental v0 v'
-  {-# INLINABLE buildDynamic #-}
+  {-# INLINEABLE buildDynamic #-}
   buildDynamic getV0 v' = PerformEventT $ lift $ buildDynamic getV0 v'
-  {-# INLINABLE headE #-}
+  {-# INLINEABLE headE #-}
   headE = PerformEventT . lift . headE
-  {-# INLINABLE now #-}
+  {-# INLINEABLE now #-}
   now = PerformEventT . lift $ now
 
 instance (MonadRef (HostFrame t), ReflexHost t) => MonadRef (PerformEventT t m) where
   type Ref (PerformEventT t m) = Ref (HostFrame t)
-  {-# INLINABLE newRef #-}
+  {-# INLINEABLE newRef #-}
   newRef = PerformEventT . lift . newRef
-  {-# INLINABLE readRef #-}
+  {-# INLINEABLE readRef #-}
   readRef = PerformEventT . lift . readRef
-  {-# INLINABLE writeRef #-}
+  {-# INLINEABLE writeRef #-}
   writeRef r = PerformEventT . lift . writeRef r
 
 instance (MonadAtomicRef (HostFrame t), ReflexHost t) => MonadAtomicRef (PerformEventT t m) where
-  {-# INLINABLE atomicModifyRef #-}
+  {-# INLINEABLE atomicModifyRef #-}
   atomicModifyRef r = PerformEventT . lift . atomicModifyRef r
