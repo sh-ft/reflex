@@ -1856,7 +1856,7 @@ unsubscribeFanInt self k b ticket unsubscribedRef = do
   -- This must be idempotent: an EventSubscription's unsubscribe action can be
   -- run more than once, and a second run could otherwise drop a bag that a newer
   -- subscriber had since installed at this key.
-  fail "unsubscribeFanInt"
+  -- fail "unsubscribeFanInt"
   putStrLn "unsubscribeFanInt"
   alreadyUnsubscribed <- atomicModifyIORef' unsubscribedRef $ \u -> (True, u)
   unless alreadyUnsubscribed $ do
@@ -2585,10 +2585,10 @@ runFrame a = SpiderHost $ {-# SCC "runFrame" #-} do
     -}
     writeIORef (switchSubscribedCurrentParent subscribed) $! subscription
     return oldSubscription
-  when (length mergeSubscriptionsToKill > 0) $
+  when (not $ null mergeSubscriptionsToKill) $
     putStrLn $ "killing " <> show (length mergeSubscriptionsToKill) <> " merge subscriptions"
   liftIO $ mapM_ unsubscribe mergeSubscriptionsToKill
-  when (length switchSubscriptionsToKill > 0) $
+  when (not $ null switchSubscriptionsToKill) $
     putStrLn $ "killing " <> show (length switchSubscriptionsToKill) <> " switch subscriptions"
   liftIO $ mapM_ unsubscribe switchSubscriptionsToKill
   forM_ toReconnect $ \(SomeSwitchSubscribed subscribed) -> {-# SCC "switchSubscribed_2" #-} do

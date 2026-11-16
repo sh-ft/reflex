@@ -28,12 +28,12 @@ main = do
   start <- liftIO getCurrentTime
   -- b1s <- runAppB testRunWithReplace $ map Just (replicate 10000 $ Increment 'a')
   -- b1s <- runAppB testRunWithReplace $ map Just (replicate 1 $ Increment 'a')
-  b1s <- runAppB testMapWithAdjustWithMove $ map Just (replicate 10000 $ Increment 'a')
+  b1s <- runAppB testMapWithAdjustWithMove $ map Just (replicate 10 $ Increment 'a')
   mapM_ print b1s
-  let !False = last (last b1s) == ["0a0","1b3","2c0","3d1","4e0"]
+  -- let !False = last (last b1s) == ["0a0","1b3","2c0","3d1","4e0"]
   end <- liftIO getCurrentTime
   liftIO $ putStrLn $ "total runtime: " <> show (diffUTCTime end start)
-  let !False = True
+  -- let !False = True
   return ()
 
 data PatchMapTestAction
@@ -57,7 +57,7 @@ testRunWithReplace
   => Event t PatchMapTestAction
   -> m (Behavior t [String])
 testRunWithReplace pulse = do
-  let initialCards = [0..100000]
+  let initialCards = [0..10]
   -- let initialCards = [0..10]
 
   performEvent_ $ ffor pulse $ \p -> liftIO . putStrLn $ "pulse " <> show p

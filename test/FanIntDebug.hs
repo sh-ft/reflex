@@ -58,7 +58,7 @@ main = do
   b1s <- runAppB testFanInt $ Just <$> [1..maxIterations]
   -- mapM_ print b1s
   -- let !False = last (last b1s) == ["0a0","1b3","2c0","3d1","4e0"]
-  let !False = True
+  -- let !False = True
   return ()
 
 -- newtype MyTag t a = MyTag { unMyTag :: Event t a }
