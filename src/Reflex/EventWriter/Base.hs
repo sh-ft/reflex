@@ -138,7 +138,7 @@ runWithReplaceEventWriterTWith
   -> EventWriterT t w m (a, Event t b)
 runWithReplaceEventWriterTWith f a0 a' = do
   (result0, result') <- f (runEventWriterT a0) $ fmapCheap runEventWriterT a'
-  tellEvent =<< switchHold (snd result0) (fmapCheap snd result')
+  tellEvent =<< switchHoldPromptOnly (snd result0) (fmapCheap snd result')
   return (fst result0, fmapCheap fst result')
 
 -- | Like 'runWithReplaceEventWriterTWith', but for 'sequenceIntMapWithAdjust'.
