@@ -22,11 +22,15 @@ import Reflex.EventWriter.Base (EventWriterT)
 import Reflex.Host.Class
 import Reflex.PerformEvent.Base (PerformEventT (..))
 import Reflex.PostBuild.Base (PostBuildT)
+import Reflex.Profiled (ProfiledM, ProfiledTimeline, unEvent_Profiled)
 import Reflex.Query.Base (QueryT)
 import Reflex.Requester.Base (RequesterT)
 import Reflex.Requester.Base.Internal (RequesterInternalT)
+import Reflex.Spider.Internal (HasSpiderTimeline, SpiderHost, SpiderHostFrame, SpiderTimeline)
 import Reflex.TriggerEvent.Base (TriggerEventT)
 
+{-# DEPRECATED NotReady "No-op legacy class scheduled for removal; drop NotReady constraints and instances." #-}
+{-# DEPRECATED notReady, notReadyUntil "These methods will be removed together with the NotReady class." #-}
 class Monad m => NotReady t m | m -> t where
   notReadyUntil :: Event t a -> m ()
   default notReadyUntil :: (MonadTrans f, m ~ f m', NotReady t m') => Event t a -> m ()
@@ -79,3 +83,19 @@ instance NotReady t m => NotReady t (RequesterInternalT s t request response m) 
 instance NotReady t m => NotReady t (TriggerEventT t m) where
   notReadyUntil = lift . notReadyUntil
   notReady = lift notReady
+
+instance NotReady (SpiderTimeline x) (SpiderHostFrame x) where
+  notReadyUntil _ = pure ()
+  notReady = pure ()
+
+instance NotReady (SpiderTimeline x) (SpiderHost x) where
+  notReadyUntil _ = return ()
+  notReady = return ()
+
+instance HasSpiderTimeline x => NotReady (SpiderTimeline x) (PerformEventT (SpiderTimeline x) (SpiderHost x)) where
+  notReadyUntil _ = return ()
+  notReady = return ()
+
+instance NotReady t m => NotReady (ProfiledTimeline t) (ProfiledM m) where
+  notReady = lift notReady
+  notReadyUntil = lift . notReadyUntil . unEvent_Profiled
